@@ -1,0 +1,95 @@
+{
+    "$id": "http://example.com/example.json",
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "default": {},
+    "description": "The event schema that all sensors, cameras and other IOT devices will use to store their data on the database.",
+    "examples": [
+        {
+            "timestamp": "2012-04-23T18:25:43.511Z",
+            "deviceId": 1,
+            "targetId": 1,
+            "queueing": 7,
+            "freeSeats": 2,
+            "event": "personIn"
+        }
+    ],
+    "required": [
+        "timestamp",
+        "deviceId",
+        "targetId"
+    ],
+    "title": "The event schema of the database",
+    "type": "object",
+    "properties": {
+        "timestamp": {
+            "$id": "#/properties/timestamp",
+            "type": "string",
+            "title": "The timestamp of the event",
+            "description": "The timestamp of the event.",
+            "default": "",
+            "examples": [
+                "2012-04-23T18:25:43.511Z"
+            ]
+        },
+        "deviceId": {
+            "$id": "#/properties/deviceId",
+            "type": "integer",
+            "title": "The device's ID",
+            "description": "The unique ID that a device has.",
+            "default": "",
+            "examples": [
+                1,2,3
+            ]
+        },
+        "targetId": {
+            "$id": "#/properties/targetId",
+            "default": 3,
+            "description": "1 for queueing, 2 for freeSeats, 3 for event",
+            "enum": [
+                1,
+                2,
+                3
+            ],
+            "examples": [
+                1
+            ],
+            "title": "The ID of the target event that needs to be stored.",
+            "type": "integer"
+        },
+        "queueing": {
+            "$id": "#/properties/queueing",
+            "default": 0,
+            "description": "The number of people that are waiting in a queue.",
+            "examples": [
+                7
+            ],
+            "title": "The number of people in a queue",
+            "type": "integer"
+        },
+        "freeSeats": {
+            "$id": "#/properties/freeSeats",
+            "type": "integer",
+            "title": "The number of free seats available",
+            "description": "The number of free seats available for someone to sit on.",
+            "default": 0,
+            "examples": [
+                2
+            ]
+        },
+        "event": {
+            "$id": "#/properties/event",
+            "default": "",
+            "description": "Any additional event that has to be stored on the database.",
+            "examples": [
+                "personIn"
+            ],
+            "title": "An event that we want to store.",
+            "enum": [
+                "personIn",
+                "personOut"
+            ],
+            "type": "string"
+        }
+    },
+    "additionalProperties": true
+}

@@ -1,0 +1,151 @@
+{
+    "$id": "http://example.com/example.json",
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "default": {},
+    "description": "The schema specifying all cameras, sensors and IOT devices that are placed in a site.",
+    "examples": [
+        {
+            "deviceId": 1,
+            "deviceType": "camera,sensor",
+            "deviceLocation": "Main entrance",
+            "site": "GOSH DRIVE",
+            "isIndoor": true,
+            "floor": 1,
+            "maxOccupancy": 50
+        }
+    ],
+    "required": [
+        "deviceId",
+        "deviceType",
+        "deviceLocation",
+        "site",
+        "isIndoor"
+    ],
+    "title": "The device schema of the database",
+    "type": "object",
+    "properties": {
+        "deviceId": {
+            "$id": "#/properties/deviceId",
+            "type": "integer",
+            "title": "The device's ID",
+            "description": "The unique ID that a device has.",
+            "default": "",
+            "examples": [
+                1,2,3
+            ]
+        },
+        "deviceType": {
+            "$id": "#/properties/deviceType",
+            "type": "string",
+            "title": "The type of the device",
+            "description": "The type of device that is being used to capture real-time data.",
+            "default": "",
+            "examples": [
+                "camera"
+            ],
+            "enum": [
+                "camera"
+            ]
+        },
+        "deviceLocation": {
+            "$id": "#/properties/deviceLocation",
+            "type": "string",
+            "title": "The location of the device",
+            "description": "The location where the device is placed.",
+            "default": "",
+            "examples": [
+                "Main entrance"
+            ]
+        },
+        "site": {
+            "$id": "#/properties/site",
+            "type": "string",
+            "title": "The site of the device",
+            "description": "The site where the device is placed.",
+            "default": "",
+            "examples": [
+                "GOSH DRIVE"
+            ]
+        },
+        "isIndoor": {
+            "$id": "#/properties/isIndoor",
+            "type": "boolean",
+            "title": "The attribute specifying if the device's location is indoor",
+            "description": "The attribute can be true for indoor and false for outdoor",
+            "default": false,
+            "examples": [
+                true
+            ]
+        },
+        "floor": {
+            "$id": "#/properties/floor",
+            "type": "integer",
+            "title": "The floor where the device is placed",
+            "description": "The floor where the device is placed, if isIndoor is set to true",
+            "default": "",
+            "examples": [
+                1
+            ]
+        },
+        "maxOccupancy": {
+            "$id": "#/properties/maxOccupancy",
+            "type": "integer",
+            "title": "The maxOccupancy schema",
+            "description": "An explanation about the purpose of this instance.",
+            "default": 0,
+            "examples": [
+                50
+            ]
+        },
+        "targetId": {
+            "$id": "#/properties/targetId",
+            "default": 0,
+            "description": "1 for queueing, 2 for freeSeats, 3 for event",
+            "enum": [
+                1,
+                2,
+                3
+            ],
+            "examples": [
+                1
+            ],
+            "title": "The targetId schema",
+            "type": "integer"
+        },
+        "queueing": {
+            "$id": "#/properties/queueing",
+            "default": 0,
+            "description": "The number of people in a queue. Exists only when targetId is 1.",
+            "examples": [
+                7
+            ],
+            "title": "Number of people in a queue",
+            "type": "integer"
+        },
+        "freeSeats": {
+            "$id": "#/properties/freeSeats",
+            "type": "integer",
+            "title": "The number of available seats",
+            "description": "The number of available seats. Exists only when targetId is 2.",
+            "default": 0,
+            "examples": [
+                2
+            ]
+        },
+        "event": {
+            "$id": "#/properties/event",
+            "default": "",
+            "description": "The event that occured and needs to be stored. Exists only when targetId is 3.",
+            "examples": [
+                "personIn"
+            ],
+            "title": "The event that occured and needs to be stored.",
+            "enum": [
+                "personIn",
+                "personOut"
+            ],
+            "type": "string"
+        }
+    },
+    "additionalProperties": true
+}
