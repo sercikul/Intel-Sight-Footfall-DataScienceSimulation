@@ -51,6 +51,8 @@ def synthesise_data(devices, start_ts, end_ts, freq_ts):
         # Bring in other attributes
         df['targetID'] = target_id
         df['deviceID'] = i
+        df['freeSeats'] = ""
+        df['event'] = ""
 
         # Append device-specific df to device_lst
         device_lst.append(df)
@@ -62,10 +64,10 @@ def synthesise_data(devices, start_ts, end_ts, freq_ts):
 
     df_total = df_total.sort_values(by = 'timestamp')
 
-    return df_total.head(50)
+    return df_total.head(40)
 
 
 
-print(synthesise_data(["1", "2", "3", "4"], '28/6/2020', 'now', "10S"))
+#print(synthesise_data(["1", "2", "3", "4"], '28/6/2020', 'now', "10S"))
 
 #print(df)
