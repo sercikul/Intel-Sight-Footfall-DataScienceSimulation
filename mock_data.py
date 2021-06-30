@@ -64,10 +64,10 @@ def synthesise_data(devices, start_ts, end_ts, freq_ts):
 
     df_total = df_total.sort_values(by = 'timestamp')
 
-    return df_total.head(40)
+    return df_total
 
 
 
-#print(synthesise_data(["1", "2", "3", "4"], '28/6/2020', 'now', "10S"))
+print(synthesise_data(["1", "2", "3", "4"], '28/6/2019', 'now', "10S"))
 
 #print(df)
