@@ -7,50 +7,52 @@ import random
 # Event data
 # Normal distribution per venue regarding time ?
 
-# Do function where you can specify all deviceIDs.
-
-# targets = {
-#     '1':
-#     '2':
-#     '3':
-#     '4':
-# }
-
 attributes = ['targetID', 'deviceID', 'timestamp', 'queueing', 'freeSeats', 'event']
-#df = pd.DataFrame(columns = attributes)
 
-#df['data'] = np.random.randint(0, 100, size=(len(date_rng)))
+
+# Specify date range, start/end hours of the data frame.
+# Specify a normal distributed mean and std for footfall (e.g. queue, free seats) in the given time frame.
+# Specify the use case/attribute.
+
+def create_df(date_range, start_hour: int, end_hour: int, mean: int, std: int, use_case: str):
+    interval_filter = (date_range.hour <= end_hour) & (date_range.hour >= start_hour)
+    filtered_ts = date_range[interval_filter]
+    df = pd.DataFrame(filtered_ts, columns=["timestamp"])
+    traffic = np.random.normal(loc=mean, scale=std, size=(len(df)))
+    df[use_case] = traffic.astype(int)
+
+    return df
+
 
 # Specify devices, start, end as well as frequency of time series
 # Interval - timestamp approach.
-def synthesise_data(devices, start_ts, end_ts, freq_ts):
+def synthesise_data(device_info: dict, start_ts: str, end_ts: str, freq_ts: str, use_case: str):
     target_id = "1"
     device_lst = []
     # Devices for loop
-    for i in devices:
+    for key in device_info:
         date_rng = pd.date_range(start=start_ts, end=end_ts, freq=freq_ts)
-        filter_peak_time = (date_rng.hour < 20) & (date_rng.hour > 7)
-        peak_times = date_rng[filter_peak_time]
 
-        peak_times_df = pd.DataFrame(peak_times, columns=['timestamp'])
-        high_traffic = np.random.normal(loc=20, scale=4, size=(len(peak_times_df)))
-        peak_times_df['queueing'] = high_traffic.astype(int)
-
-        # Non-peak time footfall
-        filter_low_time = (date_rng.hour > 19) | (date_rng.hour < 8)
-        low_times = date_rng[filter_low_time]
-
-        low_times_df = pd.DataFrame(low_times, columns=['timestamp'])
-        low_traffic = np.random.normal(loc=8, scale=1, size=(len(low_times_df)))
-        low_times_df['queueing'] = low_traffic.astype(int)
-
+        # Queue from 0 to 4 A.M.
+        midnight_queue_df = create_df(date_rng, 0, 4, device_info[key]["midnight"]["mean"], device_info[key]["midnight"]["std"], use_case)
+        # Queue from 5 to 7 A.M.
+        early_morning_queue_df = create_df(date_rng, 5, 7, device_info[key]["early_morning"]["mean"], device_info[key]["early_morning"]["std"], use_case)
+        # Queue from 8 to 11 A.M.
+        morning_queue_df = create_df(date_rng, 8, 11, device_info[key]["morning"]["mean"], device_info[key]["morning"]["std"], use_case)
+        # Queue from 12 to 4 P.M.
+        noon_queue_df = create_df(date_rng, 12, 16, device_info[key]["noon"]["mean"], device_info[key]["noon"]["std"], use_case)
+        # Queue from 5 to 8 P.M.
+        early_evening_queue_df = create_df(date_rng, 17, 20, device_info[key]["early_evening"]["mean"], device_info[key]["early_evening"]["std"], use_case)
+        # Queue from 9 to 11 P.M.
+        evening_queue_df = create_df(date_rng, 21, 23, device_info[key]["evening"]["mean"], device_info[key]["evening"]["std"], use_case)
         # Concatenate low and peak times
-        frames = [low_times_df, peak_times_df]
+        frames = [midnight_queue_df, early_morning_queue_df, morning_queue_df, noon_queue_df, early_evening_queue_df,
+                  evening_queue_df]
         df = pd.concat(frames)
 
         # Bring in other attributes
         df['targetID'] = target_id
-        df['deviceID'] = i
+        df['deviceID'] = key
         df['freeSeats'] = ""
         df['event'] = ""
 
@@ -62,12 +64,32 @@ def synthesise_data(devices, start_ts, end_ts, freq_ts):
     # Concat the df in the device_lst
     df_total = pd.concat(device_lst)
 
-    df_total = df_total.sort_values(by = 'timestamp')
+    df_total = df_total.sort_values(["timestamp", "deviceID"], ascending=(True, True))
+    df_total = df_total.reset_index(drop=True)
 
-    return df_total
+    return df_total.head(50)
 
 
+# Specify parameters
 
-print(synthesise_data(["1", "2", "3", "4"], '28/6/2019', 'now', "10S"))
+devices = {"1": {"midnight": {"mean": 1, "std": 1},
+                 "early_morning": {"mean": 4, "std": 2},
+                 "morning": {"mean": 16, "std": 3},
+                 "noon": {"mean": 24, "std": 4},
+                 "early_evening": {"mean": 12, "std": 2},
+                 "evening": {"mean": 8, "std": 2}},
 
-#print(df)
+           "2": {"midnight": {"mean": 3, "std": 1},
+                 "early_morning": {"mean": 10, "std": 2},
+                 "morning": {"mean": 26, "std": 4},
+                 "noon": {"mean": 44, "std": 5},
+                 "early_evening": {"mean": 32, "std": 3},
+                 "evening": {"mean": 14, "std": 2}}
+           }
+
+start_ts = "28/6/2019"
+end_ts = "now"
+interval_freq = "10S"
+use_case = "queueing"
+
+print(synthesise_data(devices, start_ts, end_ts, interval_freq, use_case))
