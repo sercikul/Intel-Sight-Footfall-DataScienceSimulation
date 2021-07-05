@@ -3,6 +3,7 @@ import numpy as np
 import calendar
 from datetime import datetime
 import random
+from numpy.random import choice
 
 # Event data
 # Normal distribution per venue regarding time ?
@@ -14,45 +15,78 @@ attributes = ['timestamp', 'deviceID', 'targetID', 'queueing', 'freeSeats', 'eve
 # Specify a normal distributed mean and std for footfall (e.g. queue, free seats) in the given time frame.
 # Specify the use case/attribute.
 
-def create_df(date_range, intervals: dict, devices: dict, device_id: str, use_case: str):
+# Timestamp approach (Use Cases 1 (queueing) and 2 (freeSeats))
+def create_df_timestamp(date_range, intervals: dict, device: dict, use_case: str):
     df_collection = []
     for key, value in intervals.items():
         interval_filter = (date_range.hour <= value[1]) & (date_range.hour >= value[0])
         filtered_ts = date_range[interval_filter]
         df = pd.DataFrame(filtered_ts, columns=["timestamp"])
-        traffic = np.random.normal(loc=devices[device_id][key][use_case]["mean"], scale=devices[device_id][key][use_case]["std"], size=(len(df)))
+        traffic = np.random.normal(loc=device["footfall"][key]["mean"],
+                                   scale=device["footfall"][key]["std"], size=(len(df)))
         df[use_case] = traffic.astype(int)
-
         # Append df to collection
         df_collection.append(df)
 
     return df_collection
 
 
+# Event-based approach
+def create_df_event(start_ts: str, end_ts: str, intervals: dict, device: dict):
+    df_collection = []
+    start_num = pd.to_datetime(start_ts).value // 10 ** 9
+    end_num = pd.to_datetime(end_ts).value // 10 ** 9
+    events = device["events"]
+    for key, value in intervals.items():
+        frequency = (end_num - start_num) // device["footfall"][key]["freq"]
+        event_weights = device["footfall"][key]["weights"]
+        date_rng = pd.to_datetime(np.random.randint(start_num, end_num, frequency), unit='s')
+        interval_filter = (date_rng.hour <= value[1]) & (date_rng.hour >= value[0])
+        filtered_ts = date_rng[interval_filter]
+        df_event = pd.DataFrame(filtered_ts, columns=["timestamp"])
+        # Create event column with values
+        df_event['event'] = np.random.choice(events, size=len(df_event), p=event_weights)
+
+        # Append dataframes
+        df_collection.append(df_event)
+
+    return df_collection
+
+
 # Specify devices, start, end as well as frequency of time series
 # Interval - timestamp approach.
-def synthesise_data(device_info: dict, intervals: dict, start_ts: str, end_ts: str, freq_ts: str, use_case: str, use_case_dict: dict):
-    target = [k for k, v in use_case_dict.items() if v == use_case]
-    target_id = target[0]
+
+# Synthesise data for use cases 1 and 2.
+
+# CLARIFY IF ONE DEVICEID FOR ONE TARGET
+def synthesise_data(devices: list, use_cases: dict, intervals: dict, start_ts: str, end_ts: str, freq_ts: str):
     device_lst = []
     # Devices for loop
-    for key in device_info:
-        date_rng = pd.date_range(start=start_ts, end=end_ts, freq=freq_ts)
+    for device in devices:
+        target_id = device["useCase"]
+        device_id = device["deviceID"]
+        use_case = use_cases[target_id]
+        # If not event-based.
+        if use_case != "event":
+            date_rng = pd.date_range(start=start_ts, end=end_ts, freq=freq_ts)
 
-        # Concatenate low and peak times
-        frames = create_df(date_rng, intervals, device_info, key, use_case)
-        df = pd.concat(frames)
+            # Concatenate low and peak times
+            stamp_frames = create_df_timestamp(date_rng, intervals, device, use_case)
+            df = pd.concat(stamp_frames)
+            df["event"] = ""
+            if use_case == "queueing":
+                df["freeSeats"] = ""
+            else:
+                df["queueing"] = ""
+        else:
+            event_frames = create_df_event(start_ts, end_ts, intervals, device)
+            df = pd.concat(event_frames)
+            df["freeSeats"] = ""
+            df["queueing"] = ""
 
         # Bring in other attributes
         df['targetID'] = target_id
-        df['deviceID'] = key
-
-        if use_case == "queueing":
-            df['freeSeats'] = ""
-        else:
-            df['queueing'] = ""
-
-        df['event'] = ""
+        df['deviceID'] = device_id
 
         # Append device-specific df to device_lst
         device_lst.append(df)
@@ -68,49 +102,54 @@ def synthesise_data(device_info: dict, intervals: dict, start_ts: str, end_ts: s
     # Reorder dataframe
     df_total = df_total[attributes]
 
-    return df_total.head(500000)
+    return df_total.head(500)
 
 
+# Parameters
+start = "28/6/2019"
+end = "now"
+
+pd.set_option('display.max_rows', None)
+pd.set_option('display.max_columns', None)
+pd.set_option('display.width', None)
+pd.set_option('display.max_colwidth', -1)
 # Specify parameters
 
 # Devices (venues) have different footfall means/stds.
 
-devices = {"1": {"midnight": {"queueing": {"mean": 1, "std": 1},
-                              "freeSeats": {"mean": 25, "std": 2}},
+# Target use cases
+use_cases = {"1": "queueing",
+             "2": "freeSeats",
+             "3": "event"}
 
-                 "early_morning": {"queueing": {"mean": 4, "std": 2},
-                                   "freeSeats": {"mean": 23, "std": 2}},
+devices = [{"deviceID": "1",
+            "useCase": "1",
+            "footfall": {"midnight": {"mean": 1, "std": 1},
+                         "early_morning": {"mean": 4, "std": 2},
+                         "morning": {"mean": 16, "std": 3},
+                         "noon": {"mean": 24, "std": 4},
+                         "early_evening": {"mean": 12, "std": 2},
+                         "evening": {"mean": 8, "std": 2}}},
 
-                 "morning": {"queueing": {"mean": 16, "std": 3},
-                             "freeSeats": {"mean": 18, "std": 4}},
+           {"deviceID": "2",
+            "useCase": "2",
+            "footfall": {"midnight": {"mean": 32, "std": 2},
+                         "early_morning": {"mean": 29, "std": 3},
+                         "morning": {"mean": 20, "std": 4},
+                         "noon": {"mean": 10, "std": 4},
+                         "early_evening": {"mean": 16, "std": 3},
+                         "evening": {"mean": 26, "std": 2}}},
 
-                 "noon": {"queueing": {"mean": 24, "std": 4},
-                          "freeSeats": {"mean": 12, "std": 4}},
-
-                 "early_evening": {"queueing": {"mean": 12, "std": 2},
-                                   "freeSeats": {"mean": 20, "std": 3}},
-
-                 "evening": {"queueing": {"mean": 8, "std": 2},
-                             "freeSeats": {"mean": 21, "std": 4}}},
-
-           "2": {"midnight": {"queueing": {"mean": 3, "std": 1},
-                              "freeSeats": {"mean": 32, "std": 4}},
-
-                 "early_morning": {"queueing": {"mean": 10, "std": 2},
-                                   "freeSeats": {"mean": 29, "std": 3}},
-
-                 "morning": {"queueing": {"mean": 26, "std": 4},
-                             "freeSeats": {"mean": 20, "std": 4}},
-
-                 "noon": {"queueing": {"mean": 44, "std": 5},
-                          "freeSeats": {"mean": 10, "std": 2}},
-
-                 "early_evening": {"queueing": {"mean": 32, "std": 3},
-                                   "freeSeats": {"mean": 16, "std": 3}},
-
-                 "evening": {"queueing": {"mean": 14, "std": 2},
-                             "freeSeats": {"mean": 26, "std": 4}}}
-           }
+           {"deviceID": "3",
+            "useCase": "3",
+            "events": ["personIn", "personOut"],
+            "footfall": {"midnight": {"freq": 400, "weights": [0.4, 0.6]},
+                         "early_morning": {"freq": 60, "weights": [0.8, 0.2]},
+                         "morning": {"freq": 25, "weights": [0.7, 0.3]},
+                         "noon": {"freq": 17, "weights": [0.8, 0.2]},
+                         "early_evening": {"freq": 22, "weights": [0.2, 0.8]},
+                         "evening": {"freq": 80, "weights": [0.1, 0.9]}}}
+           ]
 
 intervals = {"midnight": [0, 4],
              "early_morning": [5, 7],
@@ -119,18 +158,16 @@ intervals = {"midnight": [0, 4],
              "early_evening": [17, 20],
              "evening": [21, 23]}
 
+
 start_ts = "28/6/2019"
 end_ts = "now"
 interval_freq = "10S"
 
-use_cases = {"1": "queueing",
-             "2": "freeSeats",
-             "3": "event"}
-
-
 # Use Case 1: Queueing
-print(synthesise_data(devices, intervals, start_ts, end_ts, interval_freq, use_cases["1"], use_cases))
-
+print(synthesise_data(devices, use_cases, intervals, start_ts, end_ts, interval_freq))
 
 # Use Case 2: Free Seats
-print(synthesise_data(devices, intervals, start_ts, end_ts, interval_freq, use_cases["2"], use_cases))
+# print(synthesise_data(devices, intervals, start_ts, end_ts, interval_freq, use_cases["2"], use_cases))
+
+# Use Case 3: Events
+# print(synthesise_event_based(start, end, event_freq, intervals, events, event_weights))
