@@ -73,16 +73,9 @@ def synthesise_data(devices: list, use_cases: dict, intervals: dict, start_ts: s
             # Concatenate low and peak times
             stamp_frames = create_df_timestamp(date_rng, intervals, device, use_case)
             df = pd.concat(stamp_frames)
-            df["event"] = ""
-            if use_case == "queueing":
-                df["freeSeats"] = ""
-            else:
-                df["queueing"] = ""
         else:
             event_frames = create_df_event(start_ts, end_ts, intervals, device)
             df = pd.concat(event_frames)
-            df["freeSeats"] = ""
-            df["queueing"] = ""
 
         # Bring in other attributes
         df['targetID'] = target_id
@@ -91,10 +84,14 @@ def synthesise_data(devices: list, use_cases: dict, intervals: dict, start_ts: s
         # Append device-specific df to device_lst
         device_lst.append(df)
 
-    # sort dataframe
-
     # Concat the df in the device_lst
     df_total = pd.concat(device_lst)
+
+    # Replace null with empty string
+
+    # Convert floats to int
+    df_total["queueing"] = df_total["queueing"].astype(pd.Int64Dtype())
+    df_total["freeSeats"] = df_total["freeSeats"].astype(pd.Int64Dtype())
 
     df_total = df_total.sort_values(["timestamp", "deviceID"], ascending=(True, True))
     df_total = df_total.reset_index(drop=True)
@@ -102,17 +99,13 @@ def synthesise_data(devices: list, use_cases: dict, intervals: dict, start_ts: s
     # Reorder dataframe
     df_total = df_total[attributes]
 
-    return df_total.head(500)
+    return df_total
 
 
 # Parameters
 start = "28/6/2019"
 end = "now"
 
-pd.set_option('display.max_rows', None)
-pd.set_option('display.max_columns', None)
-pd.set_option('display.width', None)
-pd.set_option('display.max_colwidth', -1)
 # Specify parameters
 
 # Devices (venues) have different footfall means/stds.
@@ -163,11 +156,5 @@ start_ts = "28/6/2019"
 end_ts = "now"
 interval_freq = "10S"
 
-# Use Case 1: Queueing
+# Create the data set
 print(synthesise_data(devices, use_cases, intervals, start_ts, end_ts, interval_freq))
-
-# Use Case 2: Free Seats
-# print(synthesise_data(devices, intervals, start_ts, end_ts, interval_freq, use_cases["2"], use_cases))
-
-# Use Case 3: Events
-# print(synthesise_event_based(start, end, event_freq, intervals, events, event_weights))
