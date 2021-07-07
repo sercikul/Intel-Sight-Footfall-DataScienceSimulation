@@ -1,9 +1,15 @@
 import pandas as pd
 import numpy as np
+import rapidjson as json
 import calendar
-from datetime import datetime
+import datetime
 import random
 from numpy.random import choice
+
+
+# Further to-dos
+# Change "deviceID" to "_id"
+
 
 # Event data
 # Normal distribution per venue regarding time ?
@@ -14,6 +20,18 @@ attributes = ['timestamp', 'deviceID', 'targetID', 'queueing', 'freeSeats', 'eve
 # Specify date range, start/end hours of the data frame.
 # Specify a normal distributed mean and std for footfall (e.g. queue, free seats) in the given time frame.
 # Specify the use case/attribute.
+
+# Utility function (do separate file later)
+
+# Convert datetime object to milliseconds
+def convert_to_ms(dt):
+    # Start of utc epoch
+    epoch = datetime.datetime.utcfromtimestamp(0)
+    ms = (dt - epoch).total_seconds() * 1000
+    return int(ms)
+
+
+
 
 # Timestamp approach (Use Cases 1 (queueing) and 2 (freeSeats))
 def create_df_timestamp(date_range, intervals: dict, device: dict, use_case: str):
@@ -34,17 +52,20 @@ def create_df_timestamp(date_range, intervals: dict, device: dict, use_case: str
 # Event-based approach
 def create_df_event(start_ts: str, end_ts: str, intervals: dict, device: dict):
     df_collection = []
-    start_num = pd.to_datetime(start_ts).value // 10 ** 9
-    end_num = pd.to_datetime(end_ts).value // 10 ** 9
+    start_dt = pd.to_datetime(start_ts)
+    end_dt = pd.to_datetime(end_ts)
+
+    start_num = convert_to_ms(start_dt)
+    end_num = convert_to_ms(end_dt)
     events = device["events"]
     for key, value in intervals.items():
         frequency = (end_num - start_num) // device["footfall"][key]["freq"]
-        event_weights = device["footfall"][key]["weights"]
-        date_rng = pd.to_datetime(np.random.randint(start_num, end_num, frequency), unit='s')
+        date_rng = pd.to_datetime(np.random.randint(start_num, end_num, frequency, dtype=np.int64), unit='ms')
         interval_filter = (date_rng.hour <= value[1]) & (date_rng.hour >= value[0])
         filtered_ts = date_rng[interval_filter]
         df_event = pd.DataFrame(filtered_ts, columns=["timestamp"])
         # Create event column with values
+        event_weights = device["footfall"][key]["weights"]
         df_event['event'] = np.random.choice(events, size=len(df_event), p=event_weights)
 
         # Append dataframes
@@ -106,6 +127,7 @@ def synthesise_data(devices: list, use_cases: dict, intervals: dict, start_ts: s
 start = "28/6/2019"
 end = "now"
 
+
 # Specify parameters
 
 # Devices (venues) have different footfall means/stds.
@@ -136,12 +158,12 @@ devices = [{"deviceID": "1",
            {"deviceID": "3",
             "useCase": "3",
             "events": ["personIn", "personOut"],
-            "footfall": {"midnight": {"freq": 400, "weights": [0.4, 0.6]},
-                         "early_morning": {"freq": 60, "weights": [0.8, 0.2]},
-                         "morning": {"freq": 25, "weights": [0.7, 0.3]},
-                         "noon": {"freq": 17, "weights": [0.8, 0.2]},
-                         "early_evening": {"freq": 22, "weights": [0.2, 0.8]},
-                         "evening": {"freq": 80, "weights": [0.1, 0.9]}}}
+            "footfall": {"midnight": {"freq": 400000, "weights": [0.25, 0.75]},
+                         "early_morning": {"freq": 60000, "weights": [0.75, 0.25]},
+                         "morning": {"freq": 25000, "weights": [0.7, 0.3]},
+                         "noon": {"freq": 17000, "weights": [0.6, 0.4]},
+                         "early_evening": {"freq": 22000, "weights": [0.2, 0.8]},
+                         "evening": {"freq": 80000, "weights": [0.1, 0.9]}}}
            ]
 
 intervals = {"midnight": [0, 4],
@@ -152,9 +174,35 @@ intervals = {"midnight": [0, 4],
              "evening": [21, 23]}
 
 
-start_ts = "28/6/2019"
+start_ts = "28/6/2020"
 end_ts = "now"
 interval_freq = "10S"
 
 # Create the data set
-print(synthesise_data(devices, use_cases, intervals, start_ts, end_ts, interval_freq))
+total_df = synthesise_data(devices, use_cases, intervals, start_ts, end_ts, interval_freq)
+
+# Convert to JSON
+
+df_json = total_df.to_json(orient="records", date_format="iso")
+
+
+# Pretty-print json file to check data.
+
+parsed = json.loads(df_json)
+json_file = json.dumps(parsed, indent=4)
+
+
+print(total_df)
+print(json_file)
+#print(df_json)
+## Test if realistic
+
+
+
+# Compare number of personIn with personOut
+person_in_df = total_df[total_df["event"] == "personIn"]
+person_out_df = total_df[total_df["event"] == "personOut"]
+
+#print(total_df)
+#print(person_out_df)
+#print(person_in_df)
