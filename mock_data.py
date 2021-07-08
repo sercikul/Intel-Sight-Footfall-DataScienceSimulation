@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import rapidjson as json
-import calendar
+from utilities import *
 import datetime
 import random
 from numpy.random import choice
@@ -20,17 +20,6 @@ attributes = ['timestamp', 'deviceID', 'targetID', 'queueing', 'freeSeats', 'eve
 # Specify date range, start/end hours of the data frame.
 # Specify a normal distributed mean and std for footfall (e.g. queue, free seats) in the given time frame.
 # Specify the use case/attribute.
-
-# Utility function (do separate file later)
-
-# Convert datetime object to milliseconds
-def convert_to_ms(dt):
-    # Start of utc epoch
-    epoch = datetime.datetime.utcfromtimestamp(0)
-    ms = (dt - epoch).total_seconds() * 1000
-    return int(ms)
-
-
 
 
 # Timestamp approach (Use Cases 1 (queueing) and 2 (freeSeats))
@@ -174,7 +163,7 @@ intervals = {"midnight": [0, 4],
              "evening": [21, 23]}
 
 
-start_ts = "28/6/2020"
+start_ts = "28/6/2021"
 end_ts = "now"
 interval_freq = "10S"
 
@@ -192,8 +181,8 @@ parsed = json.loads(df_json)
 json_file = json.dumps(parsed, indent=4)
 
 
-print(total_df)
-print(json_file)
+#print(total_df)
+#print(json_file)
 #print(df_json)
 ## Test if realistic
 
