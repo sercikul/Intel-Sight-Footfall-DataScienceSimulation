@@ -18,9 +18,7 @@ from numpy.random import choice
 # Event data
 # Normal distribution per venue regarding time ?
 
-# ADD EVENT ATTRIBUTE LATER
-
-attributes = ['timestamp', 'deviceID', 'targetID', 'queueing', 'freeSeats']
+attributes = ['timestamp', 'deviceID', 'targetID', 'queueing', 'freeSeats', 'event']
 
 
 # Specify date range, start/end hours of the data frame.
@@ -170,16 +168,16 @@ devices = [{"deviceID": "1",
                          "mean": 22,
                          "std": 8,
                          "min": 0,
-                         "max": 50}}#,
-         #  {"deviceID": "3",
-          #  "useCase": "3",
-           # "events": ["personIn", "personOut"],
-            #"footfall": {"midnight": {"freq": 400000, "weights": [0.25, 0.75]},
-             #            "early_morning": {"freq": 60000, "weights": [0.75, 0.25]},
-              ##           "morning": {"freq": 25000, "weights": [0.7, 0.3]},
-                #         "noon": {"freq": 17000, "weights": [0.6, 0.4]},
-                 #        "early_evening": {"freq": 22000, "weights": [0.2, 0.8]},
-                  #       "evening": {"freq": 80000, "weights": [0.1, 0.9]}}}
+                         "max": 50}},
+           {"deviceID": "3",
+            "useCase": "3",
+            "events": ["personIn", "personOut"],
+            "footfall": {"midnight": {"freq": 400000, "weights": [0.25, 0.75]},
+                         "early_morning": {"freq": 60000, "weights": [0.75, 0.25]},
+                         "morning": {"freq": 25000, "weights": [0.7, 0.3]},
+                         "noon": {"freq": 17000, "weights": [0.6, 0.4]},
+                         "early_evening": {"freq": 22000, "weights": [0.2, 0.8]},
+                         "evening": {"freq": 80000, "weights": [0.1, 0.9]}}}
            ]
 
 intervals = {"midnight": [0, 4],
