@@ -2,13 +2,17 @@ import pandas as pd
 import numpy as np
 import rapidjson as json
 from utilities import *
-import datetime
+from scipy.stats import truncnorm
+from datetime import date, timedelta, datetime
 import random
 from numpy.random import choice
 
-
 # Further to-dos
 # Change "deviceID" to "_id"
+# Add some "noise" to your data
+
+# Use moving averages to make data more realistic
+# Values should depend on PAST values and not be completely random
 
 
 # Event data
@@ -23,17 +27,46 @@ attributes = ['timestamp', 'deviceID', 'targetID', 'queueing', 'freeSeats', 'eve
 
 
 # Timestamp approach (Use Cases 1 (queueing) and 2 (freeSeats))
-def create_df_timestamp(date_range, intervals: dict, device: dict, use_case: str):
+# def create_df_timestamp(date_range, intervals: dict, device: dict, use_case: str):
+#   df_collection = []
+#  for key, value in intervals.items():
+#     interval_filter = (date_range.hour <= value[1]) & (date_range.hour >= value[0])
+#    filtered_ts = date_range[interval_filter]
+#   df = pd.DataFrame(filtered_ts, columns=["timestamp"])
+#  traffic = np.random.normal(loc=device["footfall"][key]["mean"],
+#                                scale=device["footfall"][key]["std"], size=(len(df)))
+
+# Apply exponentially-weighted-moving average to give recent data more weight
+# df[use_case] = traffic.ewm(span=6).astype(int)
+# df_id1["1-hour-EWMA"] = df_id1["freeSeats"].ewm(span=12).mean()
+# df[use_case] = traffic
+# df[use_case] = df[use_case].ewm(span=6).mean().astype(int)
+# Append df to collection
+# df_collection.append(df)
+
+# return df_collection
+
+
+def create_df_timestamp(start_ts: str, end_ts: str, freq_ts: str, device: dict, use_case: str):
     df_collection = []
-    for key, value in intervals.items():
-        interval_filter = (date_range.hour <= value[1]) & (date_range.hour >= value[0])
-        filtered_ts = date_range[interval_filter]
-        df = pd.DataFrame(filtered_ts, columns=["timestamp"])
-        traffic = np.random.normal(loc=device["footfall"][key]["mean"],
-                                   scale=device["footfall"][key]["std"], size=(len(df)))
-        df[use_case] = traffic.astype(int)
-        # Append df to collection
-        df_collection.append(df)
+    # Footfall statistics from device dict
+    ff_mean = device["footfall"]["mean"]
+    ff_std = device["footfall"]["std"]
+    ff_min = device["footfall"]["min"]
+    ff_max = device["footfall"]["max"]
+    ff_first_peak = device["footfall"]["peak_times"][0]
+    ff_second_peak = device["footfall"]["peak_times"][1]
+    # Range of time series
+    ts = pd.date_range(start=start_ts, end=end_ts, freq=freq_ts)
+    df = pd.DataFrame(ts, columns=["timestamp"])
+
+    # Mock traffic in normal distribution over time
+    traffic_arr = normal_dist(ts, ff_mean, ff_std, ff_min, ff_max, ff_first_peak, ff_second_peak)
+
+    df[use_case] = traffic_arr
+    df[use_case] = df[use_case].ewm(span=8).mean().astype(int)
+    # Append df to collection
+    df_collection.append(df)
 
     return df_collection
 
@@ -78,10 +111,10 @@ def synthesise_data(devices: list, use_cases: dict, intervals: dict, start_ts: s
         use_case = use_cases[target_id]
         # If not event-based.
         if use_case != "event":
-            date_rng = pd.date_range(start=start_ts, end=end_ts, freq=freq_ts)
+            # date_rng = pd.date_range(start=start_ts, end=end_ts, freq=freq_ts)
 
             # Concatenate low and peak times
-            stamp_frames = create_df_timestamp(date_rng, intervals, device, use_case)
+            stamp_frames = create_df_timestamp(start_ts, end_ts, freq_ts, device, use_case)
             df = pd.concat(stamp_frames)
         else:
             event_frames = create_df_event(start_ts, end_ts, intervals, device)
@@ -97,8 +130,6 @@ def synthesise_data(devices: list, use_cases: dict, intervals: dict, start_ts: s
     # Concat the df in the device_lst
     df_total = pd.concat(device_lst)
 
-    # Replace null with empty string
-
     # Convert floats to int
     df_total["queueing"] = df_total["queueing"].astype(pd.Int64Dtype())
     df_total["freeSeats"] = df_total["freeSeats"].astype(pd.Int64Dtype())
@@ -113,9 +144,6 @@ def synthesise_data(devices: list, use_cases: dict, intervals: dict, start_ts: s
 
 
 # Parameters
-start = "28/6/2019"
-end = "now"
-
 
 # Specify parameters
 
@@ -128,22 +156,19 @@ use_cases = {"1": "queueing",
 
 devices = [{"deviceID": "1",
             "useCase": "1",
-            "footfall": {"midnight": {"mean": 1, "std": 1},
-                         "early_morning": {"mean": 4, "std": 2},
-                         "morning": {"mean": 16, "std": 3},
-                         "noon": {"mean": 24, "std": 4},
-                         "early_evening": {"mean": 12, "std": 2},
-                         "evening": {"mean": 8, "std": 2}}},
+            "footfall": {"peak_times": [10, 16],
+                         "mean": 12,
+                         "std": 4,
+                         "min": 0,
+                         "max": 50}},
 
            {"deviceID": "2",
             "useCase": "2",
-            "footfall": {"midnight": {"mean": 32, "std": 2},
-                         "early_morning": {"mean": 29, "std": 3},
-                         "morning": {"mean": 20, "std": 4},
-                         "noon": {"mean": 10, "std": 4},
-                         "early_evening": {"mean": 16, "std": 3},
-                         "evening": {"mean": 26, "std": 2}}},
-
+            "footfall": {"peak_times": [11, 15],
+                         "mean": 22,
+                         "std": 8,
+                         "min": 0,
+                         "max": 50}},
            {"deviceID": "3",
             "useCase": "3",
             "events": ["personIn", "personOut"],
@@ -162,36 +187,38 @@ intervals = {"midnight": [0, 4],
              "early_evening": [17, 20],
              "evening": [21, 23]}
 
-
-start_ts = "28/6/2021"
+start_ts = "2020-06-28"
 end_ts = "now"
 interval_freq = "10S"
 
 # Create the data set
 total_df = synthesise_data(devices, use_cases, intervals, start_ts, end_ts, interval_freq)
 
+#pd.set_option('display.max_rows', None)
+#pd.set_option('display.max_columns', None)
+#pd.set_option('display.width', None)
+#pd.set_option('display.max_colwidth', -1)
+
+print(total_df)
 # Convert to JSON
 
-df_json = total_df.to_json(orient="records", date_format="iso")
-
+#df_json = total_df.to_json(orient="records", date_format="iso")
 
 # Pretty-print json file to check data.
 
-parsed = json.loads(df_json)
-json_file = json.dumps(parsed, indent=4)
+#parsed = json.loads(df_json)
+#json_file = json.dumps(parsed, indent=4)
 
-
-#print(total_df)
-#print(json_file)
-#print(df_json)
+# print(total_df)
+# print(json_file)
+# print(df_json)
 ## Test if realistic
-
 
 
 # Compare number of personIn with personOut
 person_in_df = total_df[total_df["event"] == "personIn"]
 person_out_df = total_df[total_df["event"] == "personOut"]
 
-#print(total_df)
-#print(person_out_df)
-#print(person_in_df)
+# print(total_df)
+# print(person_out_df)
+# print(person_in_df)

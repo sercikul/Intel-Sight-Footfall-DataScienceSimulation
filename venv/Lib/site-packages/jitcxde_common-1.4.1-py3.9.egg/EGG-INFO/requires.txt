@@ -1,0 +1,4 @@
+symengine>=0.3.1.dev0
+numpy
+jinja2
+setuptools
