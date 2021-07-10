@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-import rapidjson as json
+#import rapidjson as json
 from utilities import *
 from scipy.stats import truncnorm
 from datetime import date, timedelta, datetime
@@ -54,14 +54,15 @@ def create_df_timestamp(start_ts: str, end_ts: str, freq_ts: str, device: dict, 
     ff_std = device["footfall"]["std"]
     ff_min = device["footfall"]["min"]
     ff_max = device["footfall"]["max"]
-    ff_first_peak = device["footfall"]["peak_times"][0]
-    ff_second_peak = device["footfall"]["peak_times"][1]
+    ff_peak = device["footfall"]["peak_times"]
+    first_pk, second_pk = ff_peak[0], ff_peak[1]
+
     # Range of time series
     ts = pd.date_range(start=start_ts, end=end_ts, freq=freq_ts)
     df = pd.DataFrame(ts, columns=["timestamp"])
 
     # Mock traffic in normal distribution over time
-    traffic_arr = normal_dist(ts, ff_mean, ff_std, ff_min, ff_max, ff_first_peak, ff_second_peak)
+    traffic_arr = normal_dist(ts, ff_mean, ff_std, ff_min, ff_max, first_pk, second_pk, use_case)
 
     df[use_case] = traffic_arr
     df[use_case] = df[use_case].ewm(span=8).mean().astype(int)
@@ -128,7 +129,7 @@ def synthesise_data(devices: list, use_cases: dict, intervals: dict, start_ts: s
         device_lst.append(df)
 
     # Concat the df in the device_lst
-    df_total = pd.concat(device_lst)
+    df_total = pd.concat(device_lst, sort=True)
 
     # Convert floats to int
     df_total["queueing"] = df_total["queueing"].astype(pd.Int64Dtype())
@@ -140,7 +141,7 @@ def synthesise_data(devices: list, use_cases: dict, intervals: dict, start_ts: s
     # Reorder dataframe
     df_total = df_total[attributes]
 
-    return df_total
+    return df_total.head(50000)
 
 
 # Parameters
@@ -164,11 +165,11 @@ devices = [{"deviceID": "1",
 
            {"deviceID": "2",
             "useCase": "2",
-            "footfall": {"peak_times": [11, 15],
-                         "mean": 22,
-                         "std": 8,
+            "footfall": {"peak_times": [10, 16],
+                         "mean": 14,
+                         "std": 6,
                          "min": 0,
-                         "max": 50}},
+                         "max": 20}},
            {"deviceID": "3",
             "useCase": "3",
             "events": ["personIn", "personOut"],
@@ -194,12 +195,13 @@ interval_freq = "10S"
 # Create the data set
 total_df = synthesise_data(devices, use_cases, intervals, start_ts, end_ts, interval_freq)
 
-#pd.set_option('display.max_rows', None)
-#pd.set_option('display.max_columns', None)
-#pd.set_option('display.width', None)
-#pd.set_option('display.max_colwidth', -1)
+pd.set_option('display.max_rows', None)
+pd.set_option('display.max_columns', None)
+pd.set_option('display.width', None)
+pd.set_option('display.max_colwidth', -1)
 
-print(total_df)
+print(total_df.describe())
+#print(total_df)
 # Convert to JSON
 
 #df_json = total_df.to_json(orient="records", date_format="iso")
