@@ -1,7 +1,8 @@
 import datetime
-from scipy.stats import truncnorm
 import numpy as np
+
 import pandas as pd
+import random
 
 
 # Convert datetime object to milliseconds
@@ -11,9 +12,8 @@ def convert_to_ms(dt):
     ms = (dt - epoch).total_seconds() * 1000
     return int(ms)
 
-
-def get_truncated_normal(mean=0, sd=1, low=0, upp=10):
-    return truncnorm((low - mean) / sd, (upp - mean) / sd, loc=mean, scale=sd)
+def truncated_normal(mean, stddev, minval, maxval, size):
+    return np.clip(np.random.normal(mean, stddev, size=size), minval, maxval)
 
 
 def hour_weights(h, first_peak, second_peak):
@@ -25,7 +25,6 @@ def hour_weights(h, first_peak, second_peak):
         -(h - second_peak) ** 2 / (2 * sigma ** 2)) + 0.05
     return hour_weights
 
-
 # Create a normal distribution numpy array
 def normal_dist(time_series, mean, sd, min, max, first_peak, second_peak, use_case):
     weights = hour_weights(time_series.hour, first_peak, second_peak)
@@ -35,10 +34,15 @@ def normal_dist(time_series, mean, sd, min, max, first_peak, second_peak, use_ca
         weighted_mean, weighted_sd = mean * weights, sd * np.sqrt(weights)
     else:
         # The higher the footfall the lower the availability of free seats, hence, we divide
-        weighted_mean, weighted_sd = mean * weights, sd * np.sqrt(weights)
+        weighted_mean, weighted_sd = mean / weights, sd * np.sqrt(weights)
 
-    traffic = get_truncated_normal(mean=weighted_mean, sd=weighted_sd, low=min, upp=max+1)
-    traffic_arr = traffic.rvs(len(time_series))
+    weighted_mean = np.asarray(weighted_mean)
+    weighted_sd = np.asarray(weighted_sd)
+    weighted_mean[weighted_mean > max] = max
+
+    traffic_arr = truncated_normal(weighted_mean, weighted_sd, min, max, len(time_series))
 
     return traffic_arr
+
+
 

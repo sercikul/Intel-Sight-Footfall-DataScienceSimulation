@@ -7,6 +7,15 @@ from datetime import date, timedelta, datetime
 import random
 from numpy.random import choice
 
+import timeit
+
+start = timeit.default_timer()
+
+#Your statements here
+
+stop = timeit.default_timer()
+
+
 # Further to-dos
 # Change "deviceID" to "_id"
 # Add some "noise" to your data
@@ -65,7 +74,8 @@ def create_df_timestamp(start_ts: str, end_ts: str, freq_ts: str, device: dict, 
     traffic_arr = normal_dist(ts, ff_mean, ff_std, ff_min, ff_max, first_pk, second_pk, use_case)
 
     df[use_case] = traffic_arr
-    df[use_case] = df[use_case].ewm(span=8).mean().astype(int)
+    df[use_case] = np.rint(df[use_case].ewm(span=8).mean())
+    df[use_case] = df[use_case].clip(0)
     # Append df to collection
     df_collection.append(df)
 
@@ -141,7 +151,7 @@ def synthesise_data(devices: list, use_cases: dict, intervals: dict, start_ts: s
     # Reorder dataframe
     df_total = df_total[attributes]
 
-    return df_total.head(50000)
+    return df_total
 
 
 # Parameters
@@ -165,10 +175,10 @@ devices = [{"deviceID": "1",
 
            {"deviceID": "2",
             "useCase": "2",
-            "footfall": {"peak_times": [10, 16],
-                         "mean": 14,
-                         "std": 6,
-                         "min": 0,
+            "footfall": {"peak_times": [11, 16],
+                         "mean": 2,
+                         "std": 2.5,
+                         "min": -10,
                          "max": 20}},
            {"deviceID": "3",
             "useCase": "3",
@@ -200,7 +210,13 @@ pd.set_option('display.max_columns', None)
 pd.set_option('display.width', None)
 pd.set_option('display.max_colwidth', -1)
 
-print(total_df.describe())
+
+print(total_df.head(50000))
+
+#print(total_df[total_df["freeSeats"] == 0])
+
+
+
 #print(total_df)
 # Convert to JSON
 
