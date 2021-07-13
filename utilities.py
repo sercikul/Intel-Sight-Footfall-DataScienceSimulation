@@ -12,6 +12,13 @@ def convert_to_ms(dt):
     ms = (dt - epoch).total_seconds() * 1000
     return int(ms)
 
+
+def convert_arr_to_ms(dt):
+    # Start of utc epoch
+    epoch = datetime.datetime.utcfromtimestamp(0)
+    ms = (dt - epoch).total_seconds() * 1000
+    return ms.astype(int)
+
 def truncated_normal(mean, stddev, minval, maxval, size):
     return np.clip(np.random.normal(mean, stddev, size=size), minval, maxval)
 
@@ -26,11 +33,11 @@ def hour_weights(h, first_peak, second_peak):
     return hour_weights
 
 # Create a normal distribution numpy array
-def normal_dist(time_series, mean, sd, min, max, first_peak, second_peak, use_case):
-    weights = hour_weights(time_series.hour, first_peak, second_peak)
+def normal_dist(hours, mean, sd, min, max, first_peak, second_peak, use_case):
+    weights = hour_weights(hours, first_peak, second_peak)
     # More variance for low footfall times, less for high footfall times
     # The higher the footfall (weights) the more people are queueing, hence, we multiply
-    if use_case == "queueing":
+    if use_case != "freeSeats":
         weighted_mean, weighted_sd = mean * weights, sd * np.sqrt(weights)
     else:
         # The higher the footfall the lower the availability of free seats, hence, we divide
@@ -40,9 +47,20 @@ def normal_dist(time_series, mean, sd, min, max, first_peak, second_peak, use_ca
     weighted_sd = np.asarray(weighted_sd)
     weighted_mean[weighted_mean > max] = max
 
-    traffic_arr = truncated_normal(weighted_mean, weighted_sd, min, max, len(time_series))
+    traffic_arr = truncated_normal(weighted_mean, weighted_sd, min, max, len(hours))
 
     return traffic_arr
+
+
+def dwell_time(hour, overall_mean, overall_sd, first_peak, second_peak):
+    # Increase weights compared to timestamp approach to allow for higher mean
+    wghts = hour_weights(hour, first_peak, second_peak) + 0.5
+    # dwell times and
+    # Stats in ms
+    mean = overall_mean * 3_600_000 * wghts
+    sd = overall_sd * 3_600_000 * wghts
+
+    return mean, sd
 
 
 
