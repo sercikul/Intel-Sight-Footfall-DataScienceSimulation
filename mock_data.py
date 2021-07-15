@@ -43,16 +43,34 @@ def create_df_timestamp(start_ts: str, end_ts: str, freq_ts: str, device: dict, 
     ff_min = device["footfall"]["min"]
     ff_max = device["footfall"]["max"]
     ff_peak = device["footfall"]["peak_times"]
+    ff_anom = device["footfall"]["anom_freq"]
     first_pk, second_pk = ff_peak[0], ff_peak[1]
 
     # Range of time series
     ts = pd.date_range(start=start_ts, end=end_ts, freq=freq_ts)
     df = pd.DataFrame(ts, columns=["timestamp"])
 
-    # Mock traffic in normal distribution over time
-    traffic_arr = normal_dist(ts.hour, ff_mean, ff_std, ff_min, ff_max, first_pk, second_pk, use_case)
+    # Generate anomalies
+    anom_dt, anom_arr = random_anomaly_generator(ff_mean, ff_std, ff_min, ff_max,
+                                                 first_pk, second_pk, use_case, start_ts, end_ts, ff_anom)
+    # Remove anomaly datetimes from ts
+    ts = ts[ts.isin(anom_dt) == False]
 
-    df[use_case] = traffic_arr
+    print(len(anom_arr))
+    print(anom_arr)
+    print(type(anom_dt))
+
+    # Mock traffic in normal distribution over time
+    # Get hour as a float (e.g. 5:30:00 PM would be 5.5 h
+    float_h = ts.hour + (ts.minute / 60) + (ts.second / 60 / 60)
+    traffic_arr = normal_dist(float_h, ff_mean, ff_std, ff_min, ff_max, first_pk, second_pk, use_case)
+
+    df.loc[df['timestamp'].isin(anom_dt) == False, use_case] = traffic_arr
+    df.loc[df['timestamp'].isin(anom_dt), use_case] = anom_arr
+
+    # Add anomaly datetimes back
+
+    #df.loc[df['timestamp'].isin(anom_dt), use_case] = anom_arr
     df[use_case] = np.rint(df[use_case].ewm(span=8).mean())
     df[use_case] = df[use_case].clip(0)
     # Append df to collection
@@ -180,11 +198,12 @@ use_cases = {"1": "queueing",
 
 devices = [{"deviceID": "1",
             "useCase": "1",
-            "footfall": {"peak_times": [10, 16],
-                         "mean": 12,
-                         "std": 4,
-                         "min": 0,
-                         "max": 50}},
+            "footfall": {"peak_times": [11, 15],
+                         "mean": 11,
+                         "std": 3,
+                         "min": -10,
+                         "max": 100,
+                         "anom_freq": 15}},
 
            {"deviceID": "2",
             "useCase": "2",
@@ -192,7 +211,8 @@ devices = [{"deviceID": "1",
                          "mean": 4,
                          "std": 3,
                          "min": -10,
-                         "max": 20}},
+                         "max": 20,
+                         "anom_freq": 15}},
 
            {"deviceID": "3",
             "useCase": "3",
@@ -214,17 +234,20 @@ interval_freq = "10S"
 # Create the data set
 total_df = synthesise_data(devices, use_cases, start_ts, end_ts, interval_freq)
 
-#pd.set_option('display.max_rows', None)
-#pd.set_option('display.max_columns', None)
-#pd.set_option('display.width', None)
-#pd.set_option('display.max_colwidth', -1)
+pd.set_option('display.max_rows', None)
+pd.set_option('display.max_columns', None)
+pd.set_option('display.width', None)
+pd.set_option('display.max_colwidth', -1)
 
 
-#print(total_df.head(50))
+print(total_df.head(50000))
 
 
 
-print(total_df)
+#print(total_df[total_df["queueing"] > 30])
+print(total_df.describe())
+
+#print(total_df[total_df["queueing"] > 30])
 # Convert to JSON
 
 #df_json = total_df.to_json(orient="records", date_format="iso")

@@ -1,7 +1,6 @@
 from mock_data import *
 import statsmodels.api as sm
 import matplotlib.pyplot as plt
-from arch import arch_model
 
 # To Dos:
 # 1. Find appropriate methods to predict free seats and queues (on a 10 sec basis)
