@@ -124,9 +124,9 @@ def anomaly_weights(float_h):
     mu = seq[arr_peak]
     mu_h = float_h[arr_peak]
     if mu_h < 5 or mu_h > 19:
-        factor = 8
+        factor = np.random.randint(5, 12)
     else:
-        factor = 2
+        factor = np.random.randint(2, 4)
 
     # If weight below 0, then bring it back to 1 by dividing
     weights = np.exp(-(seq - mu) ** 2 / (2 * sigma ** 2)) * factor
@@ -184,7 +184,6 @@ def random_anomaly_generator(mean, sd, min, max, first_peak, second_peak, use_ca
         for hours in float_hs_lst:
             # Weights and normal dist
             weights_h = anomaly_weights(hours)
-            print(weights_h, np.max(weights_h))
             anom_weights = np.clip(weights_h, 1, 8)
             anom_result = normal_dist_anom(hours, mean, sd, min, max, first_peak, second_peak, use_case, anom_weights)
             anomaly_lst.append(anom_result)
@@ -208,9 +207,9 @@ def anomaly_weights_event(peak, event_dt):
     event_ms = event_dt * 3_600_000
 
     if peak_h < 5 or peak_h > 19:
-        factor = 8
+        factor = np.random.randint(5, 12)
     else:
-        factor = 2
+        factor = np.random.randint(2, 4)
 
     # If weight below 0, then bring it back to 1 by dividing
     weight = np.exp(-(event_ms - peak_ms) ** 2 / (2 * sigma ** 2)) * factor

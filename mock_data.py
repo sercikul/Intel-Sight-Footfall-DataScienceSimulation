@@ -171,9 +171,6 @@ def synthesise_data(devices: list, use_cases: dict, start_ts: str, end_ts: str, 
         use_case = use_cases[target_id]
         # Anomalies
         anomalies = random_anomaly_generator(ff_mean, ff_std, ff_min, ff_max, first_pk, second_pk, use_case, start_ts, end_ts, ff_anom, unit="H")
-        print(anomalies)
-        #print(use_case, anomalies)
-
         # If not event-based.
         if use_case != "event":
             # date_rng = pd.date_range(start=start_ts, end=end_ts, freq=freq_ts)
@@ -258,21 +255,21 @@ interval_freq = "10S"
 # Create the data set
 total_df = synthesise_data(devices, use_cases, start_ts, end_ts, interval_freq)
 
-#pd.set_option('display.max_rows', None)
-#pd.set_option('display.max_columns', None)
-#pd.set_option('display.width', None)
-#pd.set_option('display.max_colwidth', -1)
+pd.set_option('display.max_rows', None)
+pd.set_option('display.max_columns', None)
+pd.set_option('display.width', None)
+pd.set_option('display.max_colwidth', -1)
 
 
 #print(total_df)
 
 
 #print(total_df.loc[(total_df["timestamp"] > "2020-07-08") & (total_df["timestamp"] < "2020-07-10")])
-print(total_df.describe())
+#print(total_df.describe())
 
-#print(total_df.query("20210622 < timestamp < 20210624"))
+print(total_df.query("20210622 < timestamp < 20210624"))
 
-#print(total_df[total_df["queueing"] > 30])
+#print(total_df[total_df["queueing"] > 60])
 # Convert to JSON
 
 #df_json = total_df.to_json(orient="records", date_format="iso")
