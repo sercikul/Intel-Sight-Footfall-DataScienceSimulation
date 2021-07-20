@@ -53,17 +53,17 @@ def create_df_timestamp(start_ts: str, end_ts: str, freq_ts: str, device: dict, 
     # Generate anomalies
     anom_dt, anom_arr = random_anomaly_generator(ff_mean, ff_std, ff_min, ff_max,
                                                  first_pk, second_pk, use_case, start_ts, end_ts, ff_anom)
+
+    print(anom_dt)
     # Remove anomaly datetimes from ts
     ts = ts[ts.isin(anom_dt) == False]
 
-    print(len(anom_arr))
-    print(anom_arr)
-    print(type(anom_dt))
 
     # Mock traffic in normal distribution over time
     # Get hour as a float (e.g. 5:30:00 PM would be 5.5 h
     float_h = ts.hour + (ts.minute / 60) + (ts.second / 60 / 60)
     traffic_arr = normal_dist(float_h, ff_mean, ff_std, ff_min, ff_max, first_pk, second_pk, use_case)
+
 
     df.loc[df['timestamp'].isin(anom_dt) == False, use_case] = traffic_arr
     df.loc[df['timestamp'].isin(anom_dt), use_case] = anom_arr
@@ -80,8 +80,16 @@ def create_df_timestamp(start_ts: str, end_ts: str, freq_ts: str, device: dict, 
 
 
 # Event-based approach
-def create_df_event(start_ts: str, end_ts: str, device: dict):
+# Change event function:
+# Create array with 0 to 24 for every day inside range
+# Create normal dist of frequency for each hour
+
+
+def create_df_event(start_ts: str, end_ts: str, device: dict, n: int, unit="H"):
+    # Initialise df list
     df_collection = []
+    # Random seed for consistency
+    np.random.seed(12)
     # Footfall statistics from device dict
     ff_mean = device["footfall"]["mean"]
     ff_std = device["footfall"]["std"]
@@ -89,53 +97,56 @@ def create_df_event(start_ts: str, end_ts: str, device: dict):
     ff_max = device["footfall"]["max"]
     ff_peak = device["footfall"]["peak_times"]
     first_pk, second_pk = ff_peak[0], ff_peak[1]
-
-    # Dwell times
+    # Dwell data
     dwell_mean = device["footfall"]["dwell_mean"]
     dwell_sd = device["footfall"]["dwell_sd"]
-
-    # Normal distribution of people entering ("personIn")
-    # Numpy array of average seconds of event occurence from 0 to 24
+    # Specify name of use case column
     use_case = "event"
-    time_arr = np.arange(24)
-    traffic_arr = normal_dist(time_arr, ff_mean, ff_std, ff_min, ff_max, first_pk, second_pk, use_case)
+    # Initalise start and end dates
+    start = pd.to_datetime(start_ts)
+    end = pd.to_datetime(end_ts)
+    current = start
+    dt_lst = []
+    # Create random anomaly dates
+    anom_dt = random_dates(start, end, n, unit)
+    anom_rng = event_anomalies(anom_dt)
+    while current < end:
+        #  anom = is_anomaly(anom_dt, current)
+        # Initialise np array, after each iteration add current to array
+        # Random int should depend on the hour or if in anomaly etc.
 
-    # Start and end dates
-    start_dt = pd.to_datetime(start_ts)
-    end_dt = pd.to_datetime(end_ts)
-    # Convert to ms
-    start_num = convert_to_ms(start_dt)
-    end_num = convert_to_ms(end_dt)
+        current_h = current.hour + (current.minute / 60) + (current.second / 60 / 60)
+        is_anom = is_anomaly(anom_rng, current)
+        if is_anom:
+            peak = is_anom
+            weight = anomaly_weights_event(peak, current_h)
+            freq_mean, freq_sd = normal_dist_anom(current_h, ff_mean, ff_std, ff_min, ff_max, first_pk, second_pk, use_case, weight)
+        else:
+            freq_mean, freq_sd = normal_dist(current_h, ff_mean, ff_std, ff_min, ff_max, first_pk, second_pk, use_case)
+        # Returns random normal "In" occurrences of that hour
+        current_ff = np.random.normal(freq_mean, freq_sd)
+        # Returns passed time between two occurrences in ms.
+        next_ff = 3_600_000 / current_ff
+        # Increments current by adding next footfall.
+        current += pd.to_timedelta(next_ff, unit="MS")
+        dt_lst.append(current)
 
-    for i in range(24):
-        # Frequency per hour
-        freq_h = traffic_arr[i]
-        # Frequency per ms
-        freq_ms = freq_h / 3_600_000
-        # Duration in ms
-        duration = end_num - start_num
-        # Create personIn events
-        freq = int(duration * freq_ms)
-        in_occurrences = np.random.randint(start_num, end_num, freq, dtype=np.int64)
-        date_rng = pd.to_datetime(in_occurrences, unit='ms')
-        person_in_ts = date_rng[date_rng.hour == i]
-        df_event_in = pd.DataFrame(person_in_ts, columns=["timestamp"])
-        df_event_in['event'] = "personIn"
-        df_collection.append(df_event_in)
+    person_in_ts = pd.to_datetime(dt_lst)
+    df_event_in = pd.DataFrame(person_in_ts, columns=["timestamp"])
+    df_event_in['event'] = "personIn"
+    df_collection.append(df_event_in)
 
-        # Create personOut events. Assume that the average dwell time of a person is 3 hours and the std is 2 hours.
-      #  # Normal distribution of dwell time in milliseconds (hence, h times 3.6 million)
-
-        # Average dwell statistics of hour range
-        dw_hour_mean, dw_hour_sd = dwell_time(i, dwell_mean, dwell_sd, first_pk, second_pk)
-        dwell_time_ms = truncated_normal(dw_hour_mean, dw_hour_sd, 1000, (100 * 3_600_000), size=len(person_in_ts))
-        out_occurrences = person_in_ts + dwell_time_ms.astype('timedelta64[ms]')
-        person_out_ts = pd.to_datetime(out_occurrences, unit='ms')
-        df_event_out = pd.DataFrame(person_out_ts, columns=["timestamp"])
-        df_event_out['event'] = "personOut"
-        df_collection.append(df_event_out)
+    # Average dwell statistics
+    dw_hour_mean, dw_hour_sd = dwell_time(person_in_ts.hour, dwell_mean, dwell_sd, first_pk, second_pk)
+    dwell_time_ms = truncated_normal(dw_hour_mean, dw_hour_sd, 1000, (100 * 3_600_000), size=len(person_in_ts))
+    out_occurrences = person_in_ts + dwell_time_ms.astype('timedelta64[ms]')
+    person_out_ts = pd.to_datetime(out_occurrences, unit='ms')
+    df_event_out = pd.DataFrame(person_out_ts, columns=["timestamp"])
+    df_event_out['event'] = "personOut"
+    df_collection.append(df_event_out)
 
     return df_collection
+
 
 
 # Specify devices, start, end as well as frequency of time series
@@ -159,7 +170,7 @@ def synthesise_data(devices: list, use_cases: dict, start_ts: str, end_ts: str, 
             stamp_frames = create_df_timestamp(start_ts, end_ts, freq_ts, device, use_case)
             df = pd.concat(stamp_frames)
         else:
-            event_frames = create_df_event(start_ts, end_ts, device)
+            event_frames = create_df_event(start_ts, end_ts, device, 15, unit="H")
             df = pd.concat(event_frames)
 
         # Bring in other attributes
@@ -234,18 +245,19 @@ interval_freq = "10S"
 # Create the data set
 total_df = synthesise_data(devices, use_cases, start_ts, end_ts, interval_freq)
 
-pd.set_option('display.max_rows', None)
-pd.set_option('display.max_columns', None)
-pd.set_option('display.width', None)
-pd.set_option('display.max_colwidth', -1)
+#pd.set_option('display.max_rows', None)
+#pd.set_option('display.max_columns', None)
+#pd.set_option('display.width', None)
+#pd.set_option('display.max_colwidth', -1)
 
 
-print(total_df.head(50000))
+#print(total_df)
 
 
-
-#print(total_df[total_df["queueing"] > 30])
+#print(total_df.loc[(total_df["timestamp"] > "2020-07-08") & (total_df["timestamp"] < "2020-07-10")])
 print(total_df.describe())
+
+#print(total_df.query("20210622 < timestamp < 20210624"))
 
 #print(total_df[total_df["queueing"] > 30])
 # Convert to JSON

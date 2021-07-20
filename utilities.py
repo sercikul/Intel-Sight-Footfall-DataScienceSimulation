@@ -20,6 +20,7 @@ def convert_arr_to_ms(dt):
     return ms.astype(int)
 
 def truncated_normal(mean, stddev, minval, maxval, size):
+    np.random.seed(12)
     return np.clip(np.random.normal(mean, stddev, size=size), minval, maxval)
 
 
@@ -50,6 +51,7 @@ def hour_weights(h, first_peak, second_peak):
 
 # Create a normal distribution numpy array
 def normal_dist(hours, mean, sd, min, max, first_peak, second_peak, use_case):
+    #np.random.seed(12)
     weights = hour_weights(hours, first_peak, second_peak)
     # More variance for low footfall times, less for high footfall times
     # The higher the footfall (weights) the more people are queueing, hence, we multiply
@@ -64,9 +66,12 @@ def normal_dist(hours, mean, sd, min, max, first_peak, second_peak, use_case):
     weighted_mean[weighted_mean > max] = max
     weighted_sd[weighted_sd < 1] = 1
 
-    traffic_arr = truncated_normal(weighted_mean, weighted_sd, min, max, len(hours))
+    if use_case == "event":
+        return weighted_mean, weighted_sd
 
-    return traffic_arr
+    else:
+        traffic_arr = truncated_normal(weighted_mean, weighted_sd, min, max, len(hours))
+        return traffic_arr
 
 
 def dwell_time(hour, overall_mean, overall_sd, first_peak, second_peak):
@@ -78,6 +83,29 @@ def dwell_time(hour, overall_mean, overall_sd, first_peak, second_peak):
     sd = overall_sd * 3_600_000 * wghts
 
     return mean, sd
+
+
+def normal_dist_anom(hours, mean, sd, min, max, first_peak, second_peak, use_case, anom_weights):
+    #np.random.seed(12)
+    weights = hour_weights(hours, first_peak, second_peak) * anom_weights
+    # More variance for low footfall times, less for high footfall times
+    # The higher the footfall (weights) the more people are queueing, hence, we multiply
+    if use_case != "freeSeats":
+        weighted_mean, weighted_sd = mean * weights, sd * np.sqrt(weights)
+    else:
+        # The higher the footfall the lower the availability of free seats, hence, we divide
+        weighted_mean, weighted_sd = mean / weights, sd * np.sqrt(weights)
+
+    if use_case == "event":
+        return weighted_mean, weighted_sd
+
+    else:
+        weighted_mean = np.asarray(weighted_mean)
+        weighted_sd = np.asarray(weighted_sd)
+        weighted_mean[weighted_mean > max] = max
+        weighted_sd[weighted_sd < 1] = 1
+        traffic_arr = truncated_normal(weighted_mean, weighted_sd, min, max, len(hours))
+        return traffic_arr
 
 
 def anomaly_weights(float_h):
@@ -106,29 +134,45 @@ def anomaly_weights(float_h):
 
     return weights
 
-def random_anomaly_generator(mean, sd, min, max, first_peak, second_peak, use_case, start, end, n, unit="H"):
-    dr_lst = []
-    anomaly_lst = []
-    start = pd.to_datetime(start)
-    end = pd.to_datetime(end)
+
+
+# Generate n random dates within time range
+def random_dates(start, end, n, unit):
+    np.random.seed(12)
     days = (end - start).days + 1
     arr = start + pd.to_timedelta(np.random.randint(0, days * 24, n), unit=unit)
     sorted_arr = arr.sort_values()
+    return sorted_arr
+
+
+# Generate range from random date
+def create_date_range(rd, freq):
+    np.random.seed(12)
+    duration = float(truncated_normal(4, 1.5, 0.5, 10, 1))
+    end_dt = rd + timedelta(hours=duration)
+    dr = pd.date_range(start=rd, end=end_dt, freq=freq)
+    return dr
+
+# Generate mean and std in case there is an anomaly in footfall going on.
+# Generates an array for timestamp, and tuple (mean, std) for event data.
+
+def random_anomaly_generator(mean, sd, min, max, first_peak, second_peak, use_case, start, end, n, unit="H"):
+    # Regel das mit random seed 10
+    np.random.seed(12)
+    anomaly_lst = []
+    dr_lst = []
+    start = pd.to_datetime(start)
+    end = pd.to_datetime(end)
+    sorted_arr = random_dates(start, end, n, unit)
     for i in sorted_arr:
-        duration = float(truncated_normal(4, 1.5, 0.5, 10, 1))
-        dr = pd.date_range(start=i, end=i + timedelta(hours=duration), freq="10S")
+        dr = create_date_range(i, freq="10S")
         dr_lst.append(dr)
         # Get hour of ts
         float_h = dr.hour + (dr.minute / 60) + (dr.second / 60 / 60)
         # Weights and normal dist
-        anom_weights = anomaly_weights(float_h)
-        anom_weights = np.clip(anom_weights, 1, 8)
-        normal_dst = normal_dist(float_h, mean, sd, min, max, first_peak, second_peak, use_case)
-        # Anomaly values
-        # Bring negative values to 0 in order to avoid multiplication of negative values
-        anomaly = anom_weights * np.clip(normal_dst, 0, max)
-        # Append to anomaly lst
-        anomaly_lst.append(anomaly)
+        anom_weights = np.clip(anomaly_weights(float_h), 1, 8)
+        anom_result = normal_dist_anom(float_h, mean, sd, min, max, first_peak, second_peak, use_case, anom_weights)
+        anomaly_lst.append(anom_result)
 
     anom_dt = dr_lst[0].union_many(dr_lst[1:])
 
@@ -137,3 +181,46 @@ def random_anomaly_generator(mean, sd, min, max, first_peak, second_peak, use_ca
     anom_arr = np.concatenate(anomalies)
     return anom_dt, anom_arr
 
+
+def event_anomalies(dt):
+    range_lst = []
+    for date in dt:
+        duration = float(truncated_normal(4, 1.5, 0.5, 10, 1))
+        start_dt = date
+        end_dt = start_dt + timedelta(hours=duration)
+        rng = start_dt, end_dt
+        range_lst.append(rng)
+    return range_lst
+
+
+def anomaly_weights_event(peak, event_dt):
+    # We are assuming a sigma (standard deviation from the peak hours) of 2.
+    # Convert to ms
+    sigma = 2 * 3_600_000
+
+    # Peak
+    peak_h = peak.hour + (peak.minute / 60) + (peak.second / 60 / 60)
+    peak_ms = peak_h * 3_600_000
+    # Event date time
+    event_ms = event_dt * 3_600_000
+
+    if peak_h < 5 or peak_h > 19:
+        factor = 8
+    else:
+        factor = 2
+
+    # If weight below 0, then bring it back to 1 by dividing
+    weight = np.exp(-(event_ms - peak_ms) ** 2 / (2 * sigma ** 2)) * factor
+    return weight
+
+
+def is_anomaly(anom_dt, current_dt):
+    for date in anom_dt:
+        start = date[0]
+        end = date[1]
+        if start <= current_dt <= end:
+            peak = start + (end - start) / 2
+            return peak
+        else:
+            continue
+    return False
