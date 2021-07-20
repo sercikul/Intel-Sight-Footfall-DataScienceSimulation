@@ -35,7 +35,7 @@ attributes = ['timestamp', 'deviceID', 'targetID', 'queueing', 'freeSeats', 'eve
 # Specify the use case/attribute
 
 
-def create_df_timestamp(start_ts: str, end_ts: str, freq_ts: str, device: dict, use_case: str):
+def create_df_timestamp(start_ts: str, end_ts: str, freq_ts: str, device: dict, anomalies: tuple, use_case: str):
     df_collection = []
     # Footfall statistics from device dict
     ff_mean = device["footfall"]["mean"]
@@ -51,10 +51,9 @@ def create_df_timestamp(start_ts: str, end_ts: str, freq_ts: str, device: dict, 
     df = pd.DataFrame(ts, columns=["timestamp"])
 
     # Generate anomalies
-    anom_dt, anom_arr = random_anomaly_generator(ff_mean, ff_std, ff_min, ff_max,
-                                                 first_pk, second_pk, use_case, start_ts, end_ts, ff_anom)
+    anom_dt, anom_arr = anomalies
 
-    print(anom_dt)
+    #print(anom_dt)
     # Remove anomaly datetimes from ts
     ts = ts[ts.isin(anom_dt) == False]
 
@@ -85,7 +84,7 @@ def create_df_timestamp(start_ts: str, end_ts: str, freq_ts: str, device: dict, 
 # Create normal dist of frequency for each hour
 
 
-def create_df_event(start_ts: str, end_ts: str, device: dict, n: int, unit="H"):
+def create_df_event(start_ts: str, end_ts: str, device: dict, anomalies: list):
     # Initialise df list
     df_collection = []
     # Random seed for consistency
@@ -108,8 +107,7 @@ def create_df_event(start_ts: str, end_ts: str, device: dict, n: int, unit="H"):
     current = start
     dt_lst = []
     # Create random anomaly dates
-    anom_dt = random_dates(start, end, n, unit)
-    anom_rng = event_anomalies(anom_dt)
+    anom_rng = anomalies
     while current < end:
         #  anom = is_anomaly(anom_dt, current)
         # Initialise np array, after each iteration add current to array
@@ -159,18 +157,32 @@ def synthesise_data(devices: list, use_cases: dict, start_ts: str, end_ts: str, 
     device_lst = []
     # Devices for loop
     for device in devices:
+        # Footfall stats
+        ff_mean = device["footfall"]["mean"]
+        ff_std = device["footfall"]["std"]
+        ff_min = device["footfall"]["min"]
+        ff_max = device["footfall"]["max"]
+        ff_peak = device["footfall"]["peak_times"]
+        ff_anom = device["footfall"]["anom_freq"]
+        first_pk, second_pk = ff_peak[0], ff_peak[1]
+        ####
         target_id = device["useCase"]
         device_id = device["deviceID"]
         use_case = use_cases[target_id]
+        # Anomalies
+        anomalies = random_anomaly_generator(ff_mean, ff_std, ff_min, ff_max, first_pk, second_pk, use_case, start_ts, end_ts, ff_anom, unit="H")
+        print(anomalies)
+        #print(use_case, anomalies)
+
         # If not event-based.
         if use_case != "event":
             # date_rng = pd.date_range(start=start_ts, end=end_ts, freq=freq_ts)
 
             # Concatenate low and peak times
-            stamp_frames = create_df_timestamp(start_ts, end_ts, freq_ts, device, use_case)
+            stamp_frames = create_df_timestamp(start_ts, end_ts, freq_ts, device, anomalies, use_case)
             df = pd.concat(stamp_frames)
         else:
-            event_frames = create_df_event(start_ts, end_ts, device, 15, unit="H")
+            event_frames = create_df_event(start_ts, end_ts, device, anomalies)
             df = pd.concat(event_frames)
 
         # Bring in other attributes
@@ -232,6 +244,7 @@ devices = [{"deviceID": "1",
                          "std": 15,
                          "min": 0,
                          "max": 20000,
+                         "anom_freq": 15,
                          "dwell_mean": 1,
                          "dwell_sd": 0.3}}
            ]
