@@ -139,14 +139,23 @@ def anomaly_weights(float_h):
 def random_dates(start, end, n, use_case, unit):
     np.random.seed(12)
     dr_lst = []
+    float_hs_lst = []
     days = (end - start).days + 1
     arr = start + pd.to_timedelta(np.random.randint(0, days * 24, n), unit=unit)
     sorted_arr = arr.sort_values()
     for i in sorted_arr:
         dr = create_date_range(use_case, i, "10S")
-        print(dr)
         dr_lst.append(dr)
-    return dr_lst
+        if use_case != "event":
+            float_h = dr.hour + (dr.minute / 60) + (dr.second / 60 / 60)
+            float_hs_lst.append(float_h)
+
+    if use_case != "event":
+        anom_dt = dr_lst[0].union_many(dr_lst[1:])
+        return anom_dt, float_hs_lst
+
+    else:
+        return dr_lst
 
 # Generate range from random date
 def create_date_range(use_case, start_dt, freq):
@@ -167,27 +176,24 @@ def random_anomaly_generator(mean, sd, min, max, first_peak, second_peak, use_ca
     # Regel das mit random seed 10
     start = pd.to_datetime(start)
     end = pd.to_datetime(end)
-    dr_lst = random_dates(start, end, n, use_case, unit)
+    ts = random_dates(start, end, n, use_case, unit)
     if use_case != "event":
-        anom_dt = dr_lst[0].union_many(dr_lst[1:])
-        float_h = anom_dt.hour + (anom_dt.minute / 60) + (anom_dt.second / 60 / 60)
-        # Weights and normal dist
-        anom_weights = np.clip(anomaly_weights(float_h), 1, 8)
-        anom_result = normal_dist_anom(float_h, mean, sd, min, max, first_peak, second_peak, use_case, anom_weights)
-        return anom_dt, anom_result
+        anomaly_lst = []
+        anom_dt = ts[0]
+        float_hs_lst = ts[1]
+        for hours in float_hs_lst:
+            # Weights and normal dist
+            weights_h = anomaly_weights(hours)
+            print(weights_h, np.max(weights_h))
+            anom_weights = np.clip(weights_h, 1, 8)
+            anom_result = normal_dist_anom(hours, mean, sd, min, max, first_peak, second_peak, use_case, anom_weights)
+            anomaly_lst.append(anom_result)
+        anomalies = np.asarray(anomaly_lst)
+        anom_arr = np.concatenate(anomalies)
+
+        return anom_dt, anom_arr
     else:
-        return dr_lst
-
-
-#def event_anomalies(dt):
- #   range_lst = []
-  #  for date in dt:
-   #     duration = float(truncated_normal(4, 1.5, 0.5, 10, 1))
-    #    start_dt = date
-     #   end_dt = start_dt + timedelta(hours=duration)
-       # rng = start_dt, end_dt
-      #  range_lst.append(rng)
-    #return range_lst
+        return ts
 
 
 def anomaly_weights_event(peak, event_dt):
