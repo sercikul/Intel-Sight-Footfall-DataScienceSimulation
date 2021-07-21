@@ -113,7 +113,7 @@ def anomaly_weights(float_h):
     sigma = 2 * 3_600_000
 
     # Difference between two timestamps is 10 seconds (10_000 ms)
-    seq_start = float_h[0] * 3_600_000
+    seq_start = 0
     len_seq = len(float_h)
     seq = np.arange(seq_start, seq_start + (10_000 * len_seq), 10_000)
 
@@ -124,7 +124,7 @@ def anomaly_weights(float_h):
     mu = seq[arr_peak]
     mu_h = float_h[arr_peak]
     if mu_h < 5 or mu_h > 19:
-        factor = np.random.randint(5, 12)
+        factor = np.random.randint(10, 20)
     else:
         factor = np.random.randint(2, 4)
 
@@ -159,12 +159,14 @@ def random_dates(start, end, n, use_case, unit):
 
 # Generate range from random date
 def create_date_range(use_case, start_dt, freq):
-    duration = float(truncated_normal(4, 1.5, 0.5, 10, 1))
+    duration = float(truncated_normal(6, 2, 1, 10, 1))
     end_dt = start_dt + timedelta(hours=duration)
     if use_case != "event":
         dr = pd.date_range(start=start_dt, end=end_dt, freq=freq)
+        print(dr)
         return dr
     else:
+        print(start_dt, end_dt)
         return start_dt, end_dt
 
 
@@ -195,19 +197,22 @@ def random_anomaly_generator(mean, sd, min, max, first_peak, second_peak, use_ca
         return ts
 
 
-def anomaly_weights_event(peak, event_dt):
+def anomaly_weights_event(start, peak, event_dt):
     # We are assuming a sigma (standard deviation from the peak hours) of 2.
     # Convert to ms
     sigma = 2 * 3_600_000
-
     # Peak
     peak_h = peak.hour + (peak.minute / 60) + (peak.second / 60 / 60)
-    peak_ms = peak_h * 3_600_000
+    # Start - Peak difference
+    # Time starts at 0 ms
+    # peak ms
+    peak_ms = (peak - start).total_seconds() * 1_000
+
     # Event date time
-    event_ms = event_dt * 3_600_000
+    event_ms = (event_dt - start).total_seconds() * 1_000
 
     if peak_h < 5 or peak_h > 19:
-        factor = np.random.randint(5, 12)
+        factor = np.random.randint(10, 20)
     else:
         factor = np.random.randint(2, 4)
 
@@ -222,7 +227,7 @@ def is_anomaly(anom_dt, current_dt):
         end = date[1]
         if start <= current_dt <= end:
             peak = start + (end - start) / 2
-            return peak
+            return start, peak
         else:
             continue
     return False

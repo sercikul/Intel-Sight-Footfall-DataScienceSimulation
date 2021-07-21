@@ -23,7 +23,6 @@ stop = timeit.default_timer()
 # Use moving averages to make data more realistic
 # Values should depend on PAST values and not be completely random
 
-
 # Event data
 # Normal distribution per venue regarding time ?
 
@@ -116,8 +115,8 @@ def create_df_event(start_ts: str, end_ts: str, device: dict, anomalies: list):
         current_h = current.hour + (current.minute / 60) + (current.second / 60 / 60)
         is_anom = is_anomaly(anom_rng, current)
         if is_anom:
-            peak = is_anom
-            weight = anomaly_weights_event(peak, current_h)
+            start, peak = is_anom
+            weight = anomaly_weights_event(start, peak, current)
             freq_mean, freq_sd = normal_dist_anom(current_h, ff_mean, ff_std, ff_min, ff_max, first_pk, second_pk, use_case, weight)
         else:
             freq_mean, freq_sd = normal_dist(current_h, ff_mean, ff_std, ff_min, ff_max, first_pk, second_pk, use_case)
@@ -261,13 +260,13 @@ pd.set_option('display.width', None)
 pd.set_option('display.max_colwidth', -1)
 
 
-#print(total_df)
+#print(total_df.head(10000))
 
 
-#print(total_df.loc[(total_df["timestamp"] > "2020-07-08") & (total_df["timestamp"] < "2020-07-10")])
-#print(total_df.describe())
+print(total_df.loc[(total_df["timestamp"] > "2021-05-02 08:00:00") & (total_df["timestamp"] < "2021-05-02 20:00:00")])
+print(total_df.describe())
 
-print(total_df.query("20210622 < timestamp < 20210624"))
+#print(total_df.query("20210607 < timestamp < 20210608"))
 
 #print(total_df[total_df["queueing"] > 60])
 # Convert to JSON
