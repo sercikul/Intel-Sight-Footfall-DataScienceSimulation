@@ -3,6 +3,7 @@ import numpy as np
 import datetime
 import pandas as pd
 import random
+from itertools import cycle
 
 
 # Convert datetime object to milliseconds
@@ -134,7 +135,6 @@ def anomaly_weights(float_h):
     return weights
 
 
-
 # Generate n random dates within time range
 def random_dates(start, end, n, use_case, unit):
     np.random.seed(12)
@@ -143,9 +143,17 @@ def random_dates(start, end, n, use_case, unit):
     days = (end - start).days + 1
     arr = start + pd.to_timedelta(np.random.randint(0, days * 24, n), unit=unit)
     sorted_arr = arr.sort_values()
-    for i in sorted_arr:
-        dr = create_date_range(use_case, i, "10S")
+    len_arr = len(sorted_arr) - 1
+    # get start date of anomaly
+    start_dt = cycle(sorted_arr)
+    next_dt = next(start_dt)
+    step = 0
+    while step < len_arr:
+        step += 1
+        current_dt, next_dt = next_dt, next(start_dt)
+        dr = create_date_range(use_case, current_dt, next_dt, "10S")
         dr_lst.append(dr)
+        print(dr)
         if use_case != "event":
             float_h = dr.hour + (dr.minute / 60) + (dr.second / 60 / 60)
             float_hs_lst.append(float_h)
@@ -158,9 +166,9 @@ def random_dates(start, end, n, use_case, unit):
         return dr_lst
 
 # Generate range from random date
-def create_date_range(use_case, start_dt, freq):
-    duration = float(truncated_normal(6, 2, 1, 10, 1))
-    end_dt = start_dt + timedelta(hours=duration)
+def create_date_range(use_case, start_dt, next_dt, freq):
+    duration = float(truncated_normal(10, 3, 1, 20, 1))
+    end_dt = min(start_dt + timedelta(hours=duration), next_dt - timedelta(seconds=10))
     if use_case != "event":
         dr = pd.date_range(start=start_dt, end=end_dt, freq=freq)
         return dr
@@ -217,7 +225,6 @@ def anomaly_weights_event(start, peak, event_dt):
 
     # If weight below 0, then bring it back to 1 by dividing
     weight = np.exp(-(event_ms - peak_ms) ** 2 / (2 * sigma ** 2)) * factor
-    print(event_dt, weight)
     return weight
 
 
@@ -227,7 +234,7 @@ def is_anomaly(anom_dt, current_dt):
         end = date[1]
         if start <= current_dt <= end:
             peak = start + (end - start) / 2
-            return start, peak, end
+            return start, peak
         else:
             continue
     return False

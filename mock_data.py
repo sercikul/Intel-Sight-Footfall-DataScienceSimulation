@@ -1,10 +1,5 @@
-import pandas as pd
-import numpy as np
 #import rapidjson as json
 from utilities import *
-from scipy.stats import truncnorm
-from datetime import date, timedelta, datetime
-import random
 from numpy.random import choice
 
 import timeit
@@ -52,7 +47,6 @@ def create_df_timestamp(start_ts: str, end_ts: str, freq_ts: str, device: dict, 
     # Generate anomalies
     anom_dt, anom_arr = anomalies
 
-    #print(anom_dt)
     # Remove anomaly datetimes from ts
     ts = ts[ts.isin(anom_dt) == False]
 
@@ -115,7 +109,7 @@ def create_df_event(start_ts: str, end_ts: str, device: dict, anomalies: list):
         current_h = current.hour + (current.minute / 60) + (current.second / 60 / 60)
         is_anom = is_anomaly(anom_rng, current)
         if is_anom:
-            start_anom, peak, end_anom = is_anom
+            start_anom, peak = is_anom
             weight = anomaly_weights_event(start_anom, peak, current)
             freq_mean, freq_sd = normal_dist_anom(current_h, ff_mean, ff_std, ff_min, ff_max, first_pk, second_pk, use_case, weight)
         else:
@@ -254,17 +248,17 @@ interval_freq = "10S"
 # Create the data set
 total_df = synthesise_data(devices, use_cases, start_ts, end_ts, interval_freq)
 
-pd.set_option('display.max_rows', None)
-pd.set_option('display.max_columns', None)
-pd.set_option('display.width', None)
-pd.set_option('display.max_colwidth', -1)
+#pd.set_option('display.max_rows', None)
+#pd.set_option('display.max_columns', None)
+#pd.set_option('display.width', None)
+#pd.set_option('display.max_colwidth', -1)
 
 
 #print(total_df.head(10000))
 
 
 #print(total_df.loc[(total_df["timestamp"] > "2020-11-29 18:00:00") & (total_df["timestamp"] < "2020-11-30 02:00:00")])
-print(total_df.describe())
+#print(total_df.describe())
 
 #print(total_df.query("20210607 < timestamp < 20210608"))
 
