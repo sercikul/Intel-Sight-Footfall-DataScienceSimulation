@@ -49,31 +49,6 @@ def hour_weights(h, first_peak, second_peak):
 
     return hour_weights
 
-# Create a normal distribution numpy array
-def normal_dist(hours, mean, sd, min, max, first_peak, second_peak, use_case):
-    #np.random.seed(12)
-    weights = hour_weights(hours, first_peak, second_peak)
-    # More variance for low footfall times, less for high footfall times
-    # The higher the footfall (weights) the more people are queueing, hence, we multiply
-    if use_case != "freeSeats":
-        weighted_mean, weighted_sd = mean * weights, sd * np.sqrt(weights)
-    else:
-        # The higher the footfall the lower the availability of free seats, hence, we divide
-        weighted_mean, weighted_sd = mean / weights, sd * np.sqrt(weights)
-
-    weighted_mean = np.asarray(weighted_mean)
-    weighted_sd = np.asarray(weighted_sd)
-    weighted_mean[weighted_mean > max] = max
-    weighted_sd[weighted_sd < 1] = 1
-
-    if use_case == "event":
-        return weighted_mean, weighted_sd
-
-    else:
-        traffic_arr = truncated_normal(weighted_mean, weighted_sd, min, max, len(hours))
-        return traffic_arr
-
-
 def dwell_time(hour, overall_mean, overall_sd, first_peak, second_peak):
     # Increase weights compared to timestamp approach to allow for higher mean
     wghts = hour_weights(hour, first_peak, second_peak) + 0.5
@@ -85,9 +60,9 @@ def dwell_time(hour, overall_mean, overall_sd, first_peak, second_peak):
     return mean, sd
 
 
-def normal_dist_anom(hours, mean, sd, min, max, first_peak, second_peak, use_case, anom_weights):
+def normal_dist(hours, mean, sd, min, max, first_peak, second_peak, use_case, anom_weights, seasonal_factors):
     #np.random.seed(12)
-    weights = hour_weights(hours, first_peak, second_peak) * anom_weights
+    weights = hour_weights(hours, first_peak, second_peak) * anom_weights * seasonal_factors
     # More variance for low footfall times, less for high footfall times
     # The higher the footfall (weights) the more people are queueing, hence, we multiply
     if use_case != "freeSeats":
@@ -139,7 +114,7 @@ def anomaly_weights(float_h):
 def random_dates(start, end, n, use_case, unit):
     np.random.seed(12)
     dr_lst = []
-    float_hs_lst = []
+    float_hm_lst = []
     days = (end - start).days + 1
     arr = start + pd.to_timedelta(np.random.randint(0, days * 24, n), unit=unit)
     sorted_arr = arr.sort_values()
@@ -153,14 +128,14 @@ def random_dates(start, end, n, use_case, unit):
         current_dt, next_dt = next_dt, next(start_dt)
         dr = create_date_range(use_case, current_dt, next_dt, "10S")
         dr_lst.append(dr)
-        print(dr)
         if use_case != "event":
             float_h = dr.hour + (dr.minute / 60) + (dr.second / 60 / 60)
-            float_hs_lst.append(float_h)
+            float_m = dr.month + (dr.day / (365 / 12)) + (float_h / 24 / (365 / 12))
+            float_hm_lst.append((dr.year, float_m, float_h))
 
     if use_case != "event":
         anom_dt = dr_lst[0].union_many(dr_lst[1:])
-        return anom_dt, float_hs_lst
+        return anom_dt, float_hm_lst
 
     else:
         return dr_lst
@@ -180,7 +155,7 @@ def create_date_range(use_case, start_dt, next_dt, freq):
 # Generate mean and std in case there is an anomaly in footfall going on.
 # Generates an array for timestamp, and tuple (mean, std) for event data.
 
-def random_anomaly_generator(mean, sd, min, max, first_peak, second_peak, use_case, start, end, n, unit="H"):
+def random_anomaly_generator(mean, sd, min, max, first_peak, second_peak, high_seasons, use_case, start, end, n, unit="H"):
     # Regel das mit random seed 10
     start = pd.to_datetime(start)
     end = pd.to_datetime(end)
@@ -188,12 +163,17 @@ def random_anomaly_generator(mean, sd, min, max, first_peak, second_peak, use_ca
     if use_case != "event":
         anomaly_lst = []
         anom_dt = ts[0]
-        float_hs_lst = ts[1]
-        for hours in float_hs_lst:
+        float_hm_lst = ts[1]
+        for years, months, hours in float_hm_lst:
             # Weights and normal dist
             weights_h = anomaly_weights(hours)
             anom_weights = np.clip(weights_h, 1, 8)
-            anom_result = normal_dist_anom(hours, mean, sd, min, max, first_peak, second_peak, use_case, anom_weights)
+
+            # Seasonality
+            seasonality = seasonality_factor(high_seasons[0], high_seasons[1], months, years)
+            #print(seasonality)
+
+            anom_result = normal_dist(hours, mean, sd, min, max, first_peak, second_peak, use_case, anom_weights, seasonality)
             anomaly_lst.append(anom_result)
         anomalies = np.asarray(anomaly_lst)
         anom_arr = np.concatenate(anomalies)
@@ -238,3 +218,17 @@ def is_anomaly(anom_dt, current_dt):
         else:
             continue
     return False
+
+
+def seasonality_factor(first_peak, second_peak, current_month, current_year):
+    # In months
+    sigma = 2
+    # To depict correct month difference in case events are in different years
+    month_diff_1 = (current_year - first_peak[0]) * 12 + (current_month - first_peak[1])
+    month_diff_2 = (current_year - second_peak[0]) * 12 + (current_month - second_peak[1])
+    factor = 0.65 * np.exp(-(month_diff_1) ** 2 / (2 * sigma ** 2)) + \
+             0.45 * np.exp(-(month_diff_2) ** 2 / (2 * sigma ** 2)) +  0.7
+    return factor
+
+def weekend_factor():
+    pass
