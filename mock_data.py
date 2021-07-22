@@ -115,13 +115,13 @@ def create_df_event(start_ts: str, end_ts: str, device: dict, anomalies: list):
         current_h = current.hour + (current.minute / 60) + (current.second / 60 / 60)
         is_anom = is_anomaly(anom_rng, current)
         if is_anom:
-            start, peak = is_anom
-            weight = anomaly_weights_event(start, peak, current)
+            start_anom, peak, end_anom = is_anom
+            weight = anomaly_weights_event(start_anom, peak, current)
             freq_mean, freq_sd = normal_dist_anom(current_h, ff_mean, ff_std, ff_min, ff_max, first_pk, second_pk, use_case, weight)
         else:
             freq_mean, freq_sd = normal_dist(current_h, ff_mean, ff_std, ff_min, ff_max, first_pk, second_pk, use_case)
         # Returns random normal "In" occurrences of that hour
-        current_ff = np.random.normal(freq_mean, freq_sd)
+        current_ff = np.clip(np.random.normal(freq_mean, freq_sd), 0.5, 100_000_000_000)
         # Returns passed time between two occurrences in ms.
         next_ff = 3_600_000 / current_ff
         # Increments current by adding next footfall.
@@ -263,7 +263,7 @@ pd.set_option('display.max_colwidth', -1)
 #print(total_df.head(10000))
 
 
-print(total_df.loc[(total_df["timestamp"] > "2021-05-02 08:00:00") & (total_df["timestamp"] < "2021-05-02 20:00:00")])
+#print(total_df.loc[(total_df["timestamp"] > "2020-11-29 18:00:00") & (total_df["timestamp"] < "2020-11-30 02:00:00")])
 print(total_df.describe())
 
 #print(total_df.query("20210607 < timestamp < 20210608"))
@@ -289,5 +289,5 @@ person_in_df = total_df[total_df["event"] == "personIn"]
 person_out_df = total_df[total_df["event"] == "personOut"]
 
 # print(total_df)
-#print(person_out_df)
-#print(person_in_df)
+print(person_out_df)
+print(person_in_df)

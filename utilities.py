@@ -163,10 +163,8 @@ def create_date_range(use_case, start_dt, freq):
     end_dt = start_dt + timedelta(hours=duration)
     if use_case != "event":
         dr = pd.date_range(start=start_dt, end=end_dt, freq=freq)
-        print(dr)
         return dr
     else:
-        print(start_dt, end_dt)
         return start_dt, end_dt
 
 
@@ -209,6 +207,7 @@ def anomaly_weights_event(start, peak, event_dt):
     peak_ms = (peak - start).total_seconds() * 1_000
 
     # Event date time
+   #  print(event_dt)
     event_ms = (event_dt - start).total_seconds() * 1_000
 
     if peak_h < 5 or peak_h > 19:
@@ -218,6 +217,7 @@ def anomaly_weights_event(start, peak, event_dt):
 
     # If weight below 0, then bring it back to 1 by dividing
     weight = np.exp(-(event_ms - peak_ms) ** 2 / (2 * sigma ** 2)) * factor
+    print(event_dt, weight)
     return weight
 
 
@@ -227,7 +227,7 @@ def is_anomaly(anom_dt, current_dt):
         end = date[1]
         if start <= current_dt <= end:
             peak = start + (end - start) / 2
-            return start, peak
+            return start, peak, end
         else:
             continue
     return False
