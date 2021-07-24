@@ -1,6 +1,7 @@
 # import rapidjson as json
 from utilities import *
 from numpy.random import choice
+import time
 
 # Further to-dos
 # Change "deviceID" to "_id"
@@ -49,9 +50,9 @@ def create_df_timestamp(start_ts: str, end_ts: str, freq_ts: str, device: dict, 
     float_h = ts.hour + (ts.minute / 60) + (ts.second / 60 / 60)
     float_m = ts.month + (ts.day / 31) + (float_h / 24 / 31)
     seasonal_factors = seasonality_factor(first_seasonal_pk, second_seasonal_pk, float_m, ts.year)
-    we_holiday_factors = weekend_holiday_factor(ts.year, ts.month, ts.day, uk_holidays)
+    #we_holiday_factors = weekend_holiday_factor(ts.year, ts.month, ts.day, uk_holidays)
     traffic_arr = normal_dist(float_h, ff_mean, ff_std, ff_min, ff_max, first_pk, second_pk,
-                              use_case, 1, seasonal_factors, we_holiday_factors)
+                              use_case, 1, seasonal_factors)
 
     df.loc[df['timestamp'].isin(anom_dt) == False, use_case] = traffic_arr
     df.loc[df['timestamp'].isin(anom_dt), use_case] = anom_arr
@@ -74,6 +75,7 @@ def create_df_timestamp(start_ts: str, end_ts: str, freq_ts: str, device: dict, 
 
 def create_df_event(start_ts: str, end_ts: str, high_seasons: tuple, uk_holidays: list, device: dict, anomalies: list):
     # Initialise df list
+    st_time = time.time()
     df_collection = []
     # Random seed for consistency
     np.random.seed(12)
@@ -98,6 +100,9 @@ def create_df_event(start_ts: str, end_ts: str, high_seasons: tuple, uk_holidays
     dt_lst = []
     # Create random anomaly dates
     anom_rng = anomalies
+    # Specify amount of people visiting the place over a year
+    # Get numpy array of n dates (freq: per hour)?
+    # Get freq_mean, freq_sd of hours in date range
     while current < end:
         #  anom = is_anomaly(anom_dt, current)
         # Initialise np array, after each iteration add current to array
@@ -110,7 +115,7 @@ def create_df_event(start_ts: str, end_ts: str, high_seasons: tuple, uk_holidays
         seasonal_factors = seasonality_factor(first_seasonal_pk, second_seasonal_pk, current_m, current.year)
 
         # Weekend and holidays
-        we_holiday_factors = weekend_holiday_factor(current.year, current.month, current.day, uk_holidays)
+        #we_holiday_factors = weekend_holiday_factor(current.year, current.month, current.day, uk_holidays)
 
         is_anom = is_anomaly(anom_rng, current)
         if is_anom:
@@ -121,7 +126,7 @@ def create_df_event(start_ts: str, end_ts: str, high_seasons: tuple, uk_holidays
             weight = 1
 
         freq_mean, freq_sd = normal_dist(current_h, ff_mean, ff_std, ff_min, ff_max, first_pk, second_pk,
-                                         use_case, weight, seasonal_factors, we_holiday_factors)
+                                         use_case, weight, seasonal_factors)
 
         # Returns random normal "In" occurrences of that hour
         current_ff = np.clip(np.random.normal(freq_mean, freq_sd), 0.5, 100_000_000_000)
@@ -144,6 +149,7 @@ def create_df_event(start_ts: str, end_ts: str, high_seasons: tuple, uk_holidays
     df_event_out = pd.DataFrame(person_out_ts, columns=["timestamp"])
     df_event_out['event'] = "personOut"
     df_collection.append(df_event_out)
+    end_time = time.time()
 
     return df_collection
 
@@ -155,6 +161,7 @@ def create_df_event(start_ts: str, end_ts: str, high_seasons: tuple, uk_holidays
 
 # CLARIFY IF ONE DEVICEID FOR ONE TARGET
 def synthesise_data(devices: list, use_cases: dict, start_ts: str, end_ts: str, freq_ts: str):
+    st_time = time.time()
     device_lst = []
     # English Bank Holidays
     uk_holidays = holidays_in_uk(start_ts, end_ts)
@@ -211,6 +218,9 @@ def synthesise_data(devices: list, use_cases: dict, start_ts: str, end_ts: str, 
 
     # Reorder dataframe
     df_total = df_total[attributes]
+
+    end_time = time.time()
+    print("overall time: ", end_time - st_time)
 
     return df_total
 
@@ -276,7 +286,7 @@ print(total_df)
 
 
 #print(total_df.loc[(total_df["timestamp"] > "2020-07-25 00:00:00") & (total_df["timestamp"] < "2020-07-26 00:00:00")])
-print(total_df.describe())
+#print(total_df.describe())
 
 # print(total_df.query("20210607 < timestamp < 20210608"))
 
