@@ -14,6 +14,11 @@ def truncated_normal(mean, stddev, minval, maxval, size):
     end_time = time.time()
     return a
 
+def get_n_dates(start, end, n):
+    start_u = start.value// (10**9 // 1_000)
+    end_u = end.value// (10**9 // 1_000)
+    return np.random.randint(start_u, end_u, n, dtype=np.int64)
+
 
 def hour_weights(h, first_peak, second_peak):
     # We are assuming a sigma (standard deviation from the peak hours) of 2.
@@ -100,6 +105,7 @@ def random_dates(start, end, n, use_case, unit):
     np.random.seed(12)
     dr_lst = []
     float_ts_lst = []
+    start_end_lst = []
     days = (end - start).days + 1
     arr = start + pd.to_timedelta(np.random.randint(0, days * 24, n), unit=unit)
     sorted_arr = arr.sort_values()
@@ -133,13 +139,9 @@ def create_date_range(use_case, start_dt, next_dt, freq):
     st_time = time.time()
     duration = float(truncated_normal(10, 3, 1, 20, 1))
     end_dt = min(start_dt + timedelta(hours=duration), next_dt - timedelta(seconds=10))
-    if use_case != "event":
-        dr = pd.date_range(start=start_dt, end=end_dt, freq=freq)
-        end_time = time.time()
-        return dr
-    else:
-        end_time = time.time()
-        return start_dt, end_dt
+    dr = pd.date_range(start=start_dt, end=end_dt, freq=freq)
+    end_time = time.time()
+    return dr
 
 
 # Generate mean and std in case there is an anomaly in footfall going on.
@@ -160,12 +162,12 @@ def random_anomaly_generator(mean, sd, min, max, first_peak, second_peak, high_s
         for years, months, days, hours in float_ts_lst:
             # Weights and normal dist
             weights_h = anomaly_weights(hours)
-            anom_weights = np.clip(weights_h, 1, 8)
+            anom_weights = np.clip(weights_h, 1, 50)
             # Seasonality
             seasonality = seasonality_factor(high_seasons[0], high_seasons[1], months, years)
 
             # Weekends and holidays
-           # we_holiday_factor = weekend_holiday_factor(years, months.astype(int), days, holidays)
+            # we_holiday_factor = weekend_holiday_factor(years, months.astype(int), days, holidays)
 
             anom_result = normal_dist(hours, mean, sd, min, max, first_peak, second_peak, use_case, anom_weights,
                                       seasonality)
@@ -206,19 +208,25 @@ def anomaly_weights_event(start, peak, event_dt):
     return weight
 
 
-def is_anomaly(anom_dt, current_dt):
-    st_time = time.time()
-    for date in anom_dt:
-        start = date[0]
-        end = date[1]
-        if start <= current_dt <= end:
-            peak = start + (end - start) / 2
-            end_time = time.time()
-            return start, peak
-        else:
-            continue
-    end_time = time.time()
-    return False
+def anom_weight_arr(anom_dt, dt):
+    # Returns np array indicating whether index is an anomaly
+    # Concat list to one array and use as mask for whole range
+    weight_arr = np.ones(len(dt))
+    for anom_seq in anom_dt:
+        start = anom_seq[0]
+        end = anom_seq[-1]
+        peak = start + (end - start) / 2
+        in_seq = dt.isin(anom_seq)
+        selected_anoms = dt[in_seq]
+        anom_weights = anomaly_weights_event(start, peak, selected_anoms)
+        # Returns True for anomalies that are NOT in the current sequence, False otherwise
+        not_in_seq = ~dt.isin(anom_seq)
+        # Turn to int
+        weight_mask = not_in_seq.astype(float)
+        weight_mask[weight_mask < 1] = anom_weights
+        weight_arr *= weight_mask
+
+    return weight_arr
 
 
 def seasonality_factor(first_peak, second_peak, current_month, current_year):
