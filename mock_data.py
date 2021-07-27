@@ -22,8 +22,7 @@ attributes = ['timestamp', 'deviceID', 'targetID', 'queueing', 'freeSeats', 'eve
 # Specify the use case/attribute
 
 
-def create_df_timestamp(start_ts: str, end_ts: str, freq_ts: str, device: dict, anomalies: tuple,
-                        high_seasons: tuple, uk_holidays: list, use_case: str):
+def create_df_timestamp(ts, device: dict, anom_weights, high_seasons: tuple, uk_holidays: list, use_case: str):
     # Footfall statistics from device dict
     ff_mean = device["footfall"]["mean"]
     ff_std = device["footfall"]["std"]
@@ -34,27 +33,18 @@ def create_df_timestamp(start_ts: str, end_ts: str, freq_ts: str, device: dict, 
     first_pk, second_pk = ff_peak[0], ff_peak[1]
     # Seasonality statistcs
     first_seasonal_pk, second_seasonal_pk = high_seasons
-    # Range of time series
-    ts = pd.date_range(start=start_ts, end=end_ts, freq=freq_ts)
+    # Initialise df
     df = pd.DataFrame(ts, columns=["timestamp"])
 
-    # Generate anomalies
-    anom_dt, anom_arr = anomalies
-
-    # Remove anomaly datetimes from ts
-    ts = ts[ts.isin(anom_dt) == False]
-
-    # Mock traffic in normal distribution over time
     # Get hour as a float (e.g. 5:30:00 PM would be 5.5 h
     float_h = ts.hour + (ts.minute / 60) + (ts.second / 60 / 60)
     float_m = ts.month + (ts.day / 31) + (float_h / 24 / 31)
     seasonal_factors = seasonality_factor(first_seasonal_pk, second_seasonal_pk, float_m, ts.year)
-    #we_holiday_factors = weekend_holiday_factor(ts.year, ts.month, ts.day, uk_holidays)
+    we_holiday_factors = weekend_holiday_factor(ts, uk_holidays)
     traffic_arr = normal_dist(float_h, ff_mean, ff_std, ff_min, ff_max, first_pk, second_pk,
-                              use_case, 1, seasonal_factors)
+                              use_case, anom_weights, seasonal_factors, we_holiday_factors)
 
-    df.loc[df['timestamp'].isin(anom_dt) == False, use_case] = traffic_arr
-    df.loc[df['timestamp'].isin(anom_dt), use_case] = anom_arr
+    df[use_case] = traffic_arr
 
     # Add anomaly datetimes back
 
@@ -69,7 +59,7 @@ def create_df_timestamp(start_ts: str, end_ts: str, freq_ts: str, device: dict, 
 # Create array with 0 to 24 for every day inside range
 # Create normal dist of frequency for each hour
 
-def create_df_event(start_ts: str, end_ts: str, high_seasons: tuple, uk_holidays: list, device: dict, anomalies: list):
+def create_df_event(dr, anom_weights, high_seasons: tuple, uk_holidays: list, device: dict):
     # Initialise df list
     st_time = time.time()
     # Random seed for consistency
@@ -79,6 +69,7 @@ def create_df_event(start_ts: str, end_ts: str, high_seasons: tuple, uk_holidays
     ff_std = device["footfall"]["std"]
     ff_min = device["footfall"]["min"]
     ff_max = device["footfall"]["max"]
+    ff_anom = device["footfall"]["anom_freq"]
     ff_peak = device["footfall"]["peak_times"]
     first_pk, second_pk = ff_peak[0], ff_peak[1]
     # Seasonality statistics
@@ -88,18 +79,16 @@ def create_df_event(start_ts: str, end_ts: str, high_seasons: tuple, uk_holidays
     dwell_sd = device["footfall"]["dwell_sd"]
     # Specify name of use case column
     use_case = "event"
-    # Create date range (every 10 Minutes, more realistic distribution)
-    dr = pd.date_range(start=start_ts, end=end_ts, freq="600S")
     dr_h = dr.hour + (dr.minute / 60)
     # Per Hour on one day
     dr_m = dr.month + (dr.day / 31) + (dr_h / 24 / 31)
     # Get hour as a float (e.g. 5:30:00 PM would be 5.5 h
     seasonal_factors = seasonality_factor(first_seasonal_pk, second_seasonal_pk, dr_m, dr.year)
-    # Create anomalies
-    anom_rng = anomalies
-    # Anomaly weights
-    weight = anom_weight_arr(anom_rng, dr)
-    freq_mean, freq_sd = normal_dist(dr_h, ff_mean, 15, 0, 20000, 10, 16, use_case, seasonal_factors, weight)
+    # Weekends and holidays
+    we_holiday_factors = weekend_holiday_factor(dr, uk_holidays)
+    # Normal distribution
+    freq_mean, freq_sd = normal_dist(dr_h, ff_mean, ff_std, ff_min, ff_max, first_pk, second_pk, use_case,
+                                     seasonal_factors, anom_weights, we_holiday_factors)
     dt_lst = []
     for i in range(len(dr) - 1):
         # Returns random normal "In" occurrences of that hour
@@ -110,7 +99,7 @@ def create_df_event(start_ts: str, end_ts: str, high_seasons: tuple, uk_holidays
         dt_rng = get_n_dates(dr[i], dr[i + 1], n=current_ff_min)
         dt_lst.append(dt_rng)
 
-    dt_arr = np.array(dt_lst)
+    dt_arr = np.array(dt_lst, dtype=object)
     dt_conc = np.concatenate(dt_arr)
     event_dt = pd.to_datetime(dt_conc, unit="ms").sort_values()
 
@@ -126,8 +115,8 @@ def create_df_event(start_ts: str, end_ts: str, high_seasons: tuple, uk_holidays
     df_event_out = pd.DataFrame(person_out_ts, columns=["timestamp"])
     df_event_out['event'] = "personOut"
     df_event = pd.concat([df_event_in, df_event_out])
-    #end_time = time.time()
-    #print("events time: ", end_time-st_time)
+    end_time = time.time()
+    print("events time: ", end_time-st_time)
 
     return df_event
 
@@ -138,21 +127,14 @@ def create_df_event(start_ts: str, end_ts: str, high_seasons: tuple, uk_holidays
 # Synthesise data for use cases 1 and 2.
 
 # CLARIFY IF ONE DEVICEID FOR ONE TARGET
-def synthesise_data(devices: list, use_cases: dict, start_ts: str, end_ts: str, freq_ts: str):
+def synthesise_data(devices: list, use_cases: dict, start_ts: str, end_ts: str):
     st_time = time.time()
     device_lst = []
     # English Bank Holidays
     uk_holidays = holidays_in_uk(start_ts, end_ts)
     # Devices for loop
+
     for device in devices:
-        # Footfall stats
-        ff_mean = device["footfall"]["mean"]
-        ff_std = device["footfall"]["std"]
-        ff_min = device["footfall"]["min"]
-        ff_max = device["footfall"]["max"]
-        ff_peak = device["footfall"]["peak_times"]
-        ff_anom = device["footfall"]["anom_freq"]
-        first_pk, second_pk = ff_peak[0], ff_peak[1]
         # Seasonality
         seasonality = device["footfall"]["high_season"]
         high_seasons = list(seasonality)[0], list(seasonality)[1]
@@ -160,18 +142,19 @@ def synthesise_data(devices: list, use_cases: dict, start_ts: str, end_ts: str, 
         target_id = device["useCase"]
         device_id = device["deviceID"]
         use_case = use_cases[target_id]
-
-        # Anomalies
-        anomalies = random_anomaly_generator(ff_mean, ff_std, ff_min, ff_max, first_pk, second_pk, high_seasons,
-                                             uk_holidays, use_case, start_ts, end_ts, ff_anom, unit="H")
-
+        # FF anomalies
+        ff_anom = device["footfall"]["anom_freq"]
+        # Ts Freq
+        freq_ts = device["freq_ts"]
+        ts = pd.date_range(start=start_ts, end=end_ts, freq=freq_ts)
+        # Create anomalies
+        anom_weights = random_anomaly_generator(ts, start_ts, end_ts, ff_anom)
         # If not event-based.
         if use_case != "event":
             # Concatenate low and peak times
-            df = create_df_timestamp(start_ts, end_ts, freq_ts, device, anomalies, high_seasons, uk_holidays,
-                                               use_case)
+            df = create_df_timestamp(ts, device, anom_weights, high_seasons, uk_holidays, use_case)
         else:
-            df = create_df_event(start_ts, end_ts, high_seasons, uk_holidays, device, anomalies)
+            df = create_df_event(ts, anom_weights, high_seasons, uk_holidays, device)
 
         # Bring in other attributes
         df['targetID'] = target_id
@@ -212,16 +195,18 @@ use_cases = {"1": "queueing",
 
 devices = [{"deviceID": "1",
             "useCase": "1",
+            "freq_ts": "10S",
             "footfall": {"peak_times": [11, 15],
                          "mean": 11,
                          "std": 3,
                          "min": -10,
-                         "max": 100,
+                         "max": 2000,
                          "anom_freq": 15,
                          "high_season": {(2020, 12), (2021, 2)}}},
 
            {"deviceID": "2",
             "useCase": "2",
+            "freq_ts": "10S",
             "footfall": {"peak_times": [11, 14],
                          "mean": 4,
                          "std": 3,
@@ -232,6 +217,7 @@ devices = [{"deviceID": "1",
 
            {"deviceID": "3",
             "useCase": "3",
+            "freq_ts": "600S",
             "footfall": {"peak_times": [10, 16],
                          "mean": 150,
                          "std": 15,
@@ -248,21 +234,21 @@ end_ts = "now"
 interval_freq = "10S"
 
 # Create the data set
-total_df = synthesise_data(devices, use_cases, start_ts, end_ts, interval_freq)
+total_df = synthesise_data(devices, use_cases, start_ts, end_ts)
 
-#pd.set_option('display.max_rows', None)
-#pd.set_option('display.max_columns', None)
-#pd.set_option('display.width', None)
-#pd.set_option('display.max_colwidth', -1)
+pd.set_option('display.max_rows', None)
+pd.set_option('display.max_columns', None)
+pd.set_option('display.width', None)
+pd.set_option('display.max_colwidth', -1)
 
 
 #print(total_df)
 
 
 #print(total_df.loc[(total_df["timestamp"] > "2020-07-25 00:00:00") & (total_df["timestamp"] < "2020-07-26 00:00:00")])
-#print(total_df.describe())
+print(total_df.describe())
 
-# print(total_df.query("20210607 < timestamp < 20210608"))
+#print(total_df.query("20210703 < timestamp < 20210705"))
 
 # print(total_df[total_df["queueing"] > 60])
 # Convert to JSON
@@ -285,5 +271,5 @@ person_in_df = total_df[total_df["event"] == "personIn"]
 person_out_df = total_df[total_df["event"] == "personOut"]
 
 # print(total_df)
-print(person_out_df)
-print(person_in_df)
+#print(person_out_df)
+#print(person_in_df)

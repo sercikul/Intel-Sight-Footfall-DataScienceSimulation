@@ -44,10 +44,11 @@ def dwell_time(hour, overall_mean, overall_sd, first_peak, second_peak):
     return mean, sd
 
 
-def normal_dist(hours, mean, sd, min, max, first_peak, second_peak, use_case, anom_weights, seasonal_factors):
+def normal_dist(hours, mean, sd, min, max, first_peak, second_peak, use_case, anom_weights,
+                seasonal_factors, we_holiday_factor):
     # np.random.seed(12)
     st_time = time.time()
-    weights = hour_weights(hours, first_peak, second_peak) * anom_weights * seasonal_factors
+    weights = hour_weights(hours, first_peak, second_peak) * anom_weights * seasonal_factors * we_holiday_factor
     # More variance for low footfall times, less for high footfall times
     # The higher the footfall (weights) the more people are queueing, hence, we multiply
     if use_case != "freeSeats":
@@ -100,42 +101,35 @@ def anomaly_weights(float_h):
 
 
 # Generate n random dates within time range
-def random_dates(start, end, n, use_case, unit):
+def random_dates(start, end, n, unit):
     st_time = time.time()
     np.random.seed(12)
     dr_lst = []
     float_ts_lst = []
     start_end_lst = []
-    days = (end - start).days + 1
+    days = (end - start).days
     arr = start + pd.to_timedelta(np.random.randint(0, days * 24, n), unit=unit)
     sorted_arr = arr.sort_values()
-    len_arr = len(sorted_arr) - 1
+    len_arr = len(sorted_arr)
     # get start date of anomaly
     start_dt = cycle(sorted_arr)
     next_dt = next(start_dt)
     step = 0
     while step < len_arr:
         step += 1
-        current_dt, next_dt = next_dt, next(start_dt)
-        dr = create_date_range(use_case, current_dt, next_dt, "10S")
+        if step < 15:
+            current_dt, next_dt = next_dt, next(start_dt)
+        else:
+            current_dt, next_dt = next_dt, end
+        dr = create_date_range(current_dt, next_dt, "10S")
         dr_lst.append(dr)
-        if use_case != "event":
-            float_h = dr.hour + (dr.minute / 60) + (dr.second / 60 / 60)
-            float_m = dr.month + (dr.day / 31) + (float_h / 24 / 31)
-            float_ts_lst.append((dr.year, float_m, dr.day, float_h))
 
-    if use_case != "event":
-        anom_dt = dr_lst[0].union_many(dr_lst[1:])
-        end_time = time.time()
-        return anom_dt, float_ts_lst
-
-    else:
-        end_time = time.time()
-        return dr_lst
+    end_time = time.time()
+    return dr_lst
 
 
 # Generate range from random date
-def create_date_range(use_case, start_dt, next_dt, freq):
+def create_date_range(start_dt, next_dt, freq):
     st_time = time.time()
     duration = float(truncated_normal(10, 3, 1, 20, 1))
     end_dt = min(start_dt + timedelta(hours=duration), next_dt - timedelta(seconds=10))
@@ -147,38 +141,18 @@ def create_date_range(use_case, start_dt, next_dt, freq):
 # Generate mean and std in case there is an anomaly in footfall going on.
 # Generates an array for timestamp, and tuple (mean, std) for event data.
 
-def random_anomaly_generator(mean, sd, min, max, first_peak, second_peak, high_seasons, holidays, use_case, start, end,
-                             n,
-                             unit="H"):
+
+def random_anomaly_generator(dr, start, end, n, unit="H"):
     st_time = time.time()
     # Regel das mit random seed 10
     start = pd.to_datetime(start)
     end = pd.to_datetime(end)
-    ts = random_dates(start, end, n, use_case, unit)
-    if use_case != "event":
-        anomaly_lst = []
-        anom_dt = ts[0]
-        float_ts_lst = ts[1]
-        for years, months, days, hours in float_ts_lst:
-            # Weights and normal dist
-            weights_h = anomaly_weights(hours)
-            anom_weights = np.clip(weights_h, 1, 50)
-            # Seasonality
-            seasonality = seasonality_factor(high_seasons[0], high_seasons[1], months, years)
-
-            # Weekends and holidays
-            # we_holiday_factor = weekend_holiday_factor(years, months.astype(int), days, holidays)
-
-            anom_result = normal_dist(hours, mean, sd, min, max, first_peak, second_peak, use_case, anom_weights,
-                                      seasonality)
-            anomaly_lst.append(anom_result)
-        anomalies = np.asarray(anomaly_lst)
-        anom_arr = np.concatenate(anomalies)
-        end_time = time.time()
-        return anom_dt, anom_arr
-    else:
-        end_time = time.time()
-        return ts
+    ts = random_dates(start, end, n, unit)
+    # Weights and normal dist
+    weights_h = anom_weight_arr(ts, dr)
+    anom_weights = np.clip(weights_h, 1, 50)
+    end_time = time.time()
+    return anom_weights
 
 
 def anomaly_weights_event(start, peak, event_dt):
@@ -253,17 +227,11 @@ def holidays_in_uk(start_ts, end_ts):
     return holiday_lst
 
 
-def weekend_holiday_factor(year, month, day, holidays):
+def weekend_holiday_factor(dt, holidays):
+    dt = np.array(dt, dtype="M8[D]")
     st_time = time.time()
-    dt = np.array([year, month, day])
-    dt = dt.T
-    if dt.ndim > 1:
-        ts = [date(*x) for x in dt]
-    else:
-        ts = date(dt[0], dt[1], dt[2])
-    is_busday = np.is_busday(ts, holidays=holidays)
+    is_busday = np.is_busday(dt, holidays=holidays)
     # Non-working days
     # Make customisable when introducing inputs to program
-    we_hol_factor = np.where(is_busday, 1, np.random.uniform(0.4, 0.8))
-    end_time = time.time()
+    we_hol_factor = np.where(is_busday, 1, truncated_normal(0.7, 0.2, 0.4, 1, size=len(is_busday)))
     return we_hol_factor
