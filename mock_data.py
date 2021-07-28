@@ -236,21 +236,22 @@ interval_freq = "10S"
 # Create the data set
 total_df = synthesise_data(devices, use_cases, start_ts, end_ts)
 
-pd.set_option('display.max_rows', None)
-pd.set_option('display.max_columns', None)
-pd.set_option('display.width', None)
-pd.set_option('display.max_colwidth', -1)
+#pd.set_option('display.max_rows', None)
+#pd.set_option('display.max_columns', None)
+#pd.set_option('display.width', None)
+#pd.set_option('display.max_colwidth', -1)
 
 
 #print(total_df)
 
 
-#print(total_df.loc[(total_df["timestamp"] > "2020-07-25 00:00:00") & (total_df["timestamp"] < "2020-07-26 00:00:00")])
-print(total_df.describe())
+#print(total_df.loc[(total_df["timestamp"] > "2021-06-23 09:00:00") & (total_df["timestamp"] < "2021-06-23 18:00:00")])
+#print(total_df.describe())
 
-#print(total_df.query("20210703 < timestamp < 20210705"))
+#print(total_df.query("20210623 < timestamp < 20210624"))
 
-# print(total_df[total_df["queueing"] > 60])
+#06/22-06/24
+#print(total_df[total_df["queueing"] > 60])
 # Convert to JSON
 
 # df_json = total_df.to_json(orient="records", date_format="iso")
@@ -271,5 +272,5 @@ person_in_df = total_df[total_df["event"] == "personIn"]
 person_out_df = total_df[total_df["event"] == "personOut"]
 
 # print(total_df)
-#print(person_out_df)
-#print(person_in_df)
+print(person_out_df)
+print(person_in_df)

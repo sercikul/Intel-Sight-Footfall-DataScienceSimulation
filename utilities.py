@@ -6,17 +6,17 @@ import pandas as pd
 from itertools import cycle
 import holidays
 import time
+from numba import jit, njit
 
 
 def truncated_normal(mean, stddev, minval, maxval, size):
-    st_time = time.time()
-    a = np.clip(np.random.normal(mean, stddev, size=size), minval, maxval)
-    end_time = time.time()
-    return a
+    return np.clip(np.random.normal(mean, stddev, size=size), minval, maxval)
+
+
 
 def get_n_dates(start, end, n):
-    start_u = start.value// (10**9 // 1_000)
-    end_u = end.value// (10**9 // 1_000)
+    start_u = start.value // (10 ** 9 // 1_000)
+    end_u = end.value // (10 ** 9 // 1_000)
     return np.random.randint(start_u, end_u, n, dtype=np.int64)
 
 
@@ -199,12 +199,10 @@ def anom_weight_arr(anom_dt, dt):
         weight_mask = not_in_seq.astype(float)
         weight_mask[weight_mask < 1] = anom_weights
         weight_arr *= weight_mask
-
     return weight_arr
 
 
 def seasonality_factor(first_peak, second_peak, current_month, current_year):
-    st_time = time.time()
     # In months
     sigma = 2
     # To depict correct month difference in case events are in different years
@@ -212,26 +210,58 @@ def seasonality_factor(first_peak, second_peak, current_month, current_year):
     month_diff_2 = (current_year - second_peak[0]) * 12 + (current_month - second_peak[1])
     factor = 0.65 * np.exp(-(month_diff_1) ** 2 / (2 * sigma ** 2)) + \
              0.45 * np.exp(-(month_diff_2) ** 2 / (2 * sigma ** 2)) + 0.7
-    end_time = time.time()
     return factor
 
 
 def holidays_in_uk(start_ts, end_ts):
-    st_time = time.time()
     start, end = pd.to_datetime(start_ts), pd.to_datetime(end_ts)
     n_dates = end - start
     uk_holidays = holidays.England()
     holiday_lst = [(start + timedelta(days=day)).date() for day in range(n_dates.days + 1) if
                    (start + timedelta(days=day)) in uk_holidays]
-    end_time = time.time()
     return holiday_lst
 
 
+
+def greedy_split(arr, n, axis=0):
+    """Greedily splits an array into n blocks.
+
+    Splits array arr along axis into n blocks such that:
+        - blocks 1 through n-1 are all the same size
+        - the sum of all block sizes is equal to arr.shape[axis]
+        - the last block is nonempty, and not bigger than the other blocks
+
+    Intuitively, this "greedily" splits the array along the axis by making
+    the first blocks as big as possible, then putting the leftovers in the
+    last block.
+    """
+    length = arr.shape[axis]
+
+    # compute the size of each of the first n-1 blocks
+    block_size = np.ceil(length / float(n))
+
+    # the indices at which the splits will occur
+    ix = np.arange(block_size, length, block_size).astype(int)
+
+    return np.split(arr, ix, axis)
+
+
 def weekend_holiday_factor(dt, holidays):
-    dt = np.array(dt, dtype="M8[D]")
-    st_time = time.time()
+    dt = np.array(dt, dtype="datetime64[D]")
+    #print(len(dt))
     is_busday = np.is_busday(dt, holidays=holidays)
-    # Non-working days
+    holiday_dt = dt[is_busday == False]
+    n_holidays = len(np.unique(holiday_dt))
+    hol_arr = greedy_split(holiday_dt, n_holidays)
+    # Initialise weight array
+    weight_arr = np.ones(len(dt))
+    # Assign random value per date in array
+    for i in range(len(hol_arr)):
+        day_seq = hol_arr[i]
+        mask = np.isin(dt, day_seq[0])
+        random_weight = truncated_normal(0.75, 0.05, 0.5, 0.8, size=1)
+        day_factor = np.where(mask, random_weight, 1)
+        weight_arr *= day_factor
     # Make customisable when introducing inputs to program
-    we_hol_factor = np.where(is_busday, 1, truncated_normal(0.7, 0.2, 0.4, 1, size=len(is_busday)))
+    we_hol_factor = np.where(is_busday, 1, weight_arr)
     return we_hol_factor
