@@ -90,6 +90,7 @@ def create_df_event(dr, anom_weights, high_seasons: tuple, uk_holidays: list, de
     freq_mean, freq_sd = normal_dist(dr_h, ff_mean, ff_std, ff_min, ff_max, first_pk, second_pk, use_case,
                                      seasonal_factors, anom_weights, we_holiday_factors)
     dt_lst = []
+    crowd_lst = []
     for i in range(len(dr) - 1):
         # Returns random normal "In" occurrences of that hour
         # Hourly Footfall weight given to date array
@@ -98,7 +99,11 @@ def create_df_event(dr, anom_weights, high_seasons: tuple, uk_holidays: list, de
         current_ff_min = int(round(current_ff / 6))
         dt_rng = get_n_dates(dr[i], dr[i + 1], n=current_ff_min)
         dt_lst.append(dt_rng)
+        # Crowd
+        crowd_arr = np.full(shape=current_ff_min, fill_value=current_ff_min)
+        crowd_lst.append(crowd_arr)
 
+    # DT
     dt_arr = np.array(dt_lst, dtype=object)
     dt_conc = np.concatenate(dt_arr)
     event_dt = pd.to_datetime(dt_conc, unit="ms").sort_values()
@@ -107,8 +112,12 @@ def create_df_event(dr, anom_weights, high_seasons: tuple, uk_holidays: list, de
     df_event_in = pd.DataFrame(person_in_ts, columns=["timestamp"])
     df_event_in['event'] = "personIn"
 
+    # Crowd
+    crowd_arr = np.array(crowd_lst, dtype=object)
+    crowd = np.concatenate(crowd_arr)
+
     # Average dwell statistics
-    dw_hour_mean, dw_hour_sd = dwell_time(person_in_ts.hour, dwell_mean, dwell_sd, first_pk, second_pk)
+    dw_hour_mean, dw_hour_sd = dwell_time(person_in_ts, crowd, dwell_mean, dwell_sd, first_pk, second_pk)
     dwell_time_ms = truncated_normal(dw_hour_mean, dw_hour_sd, 1000, (100 * 3_600_000), size=len(person_in_ts))
     out_occurrences = person_in_ts + dwell_time_ms.astype('timedelta64[ms]')
     person_out_ts = pd.to_datetime(out_occurrences, unit='ms')
@@ -200,7 +209,7 @@ devices = [{"deviceID": "1",
                          "mean": 11,
                          "std": 3,
                          "min": -10,
-                         "max": 2000,
+                         "max": 2_000,
                          "anom_freq": 15,
                          "high_season": {(2020, 12), (2021, 2)}}},
 
@@ -222,7 +231,7 @@ devices = [{"deviceID": "1",
                          "mean": 150,
                          "std": 15,
                          "min": 0,
-                         "max": 20000,
+                         "max": 20_000,
                          "anom_freq": 15,
                          "high_season": {(2020, 12), (2021, 2)},
                          "dwell_mean": 1,
@@ -236,16 +245,16 @@ interval_freq = "10S"
 # Create the data set
 total_df = synthesise_data(devices, use_cases, start_ts, end_ts)
 
-#pd.set_option('display.max_rows', None)
-#pd.set_option('display.max_columns', None)
-#pd.set_option('display.width', None)
-#pd.set_option('display.max_colwidth', -1)
+pd.set_option('display.max_rows', None)
+pd.set_option('display.max_columns', None)
+pd.set_option('display.width', None)
+pd.set_option('display.max_colwidth', -1)
 
 
 #print(total_df)
 
 
-#print(total_df.loc[(total_df["timestamp"] > "2021-06-23 09:00:00") & (total_df["timestamp"] < "2021-06-23 18:00:00")])
+print(total_df.loc[(total_df["timestamp"] > "2020-11-11 11:00:00") & (total_df["timestamp"] < "2020-11-11 20:00:00")])
 #print(total_df.describe())
 
 #print(total_df.query("20210623 < timestamp < 20210624"))
@@ -272,5 +281,5 @@ person_in_df = total_df[total_df["event"] == "personIn"]
 person_out_df = total_df[total_df["event"] == "personOut"]
 
 # print(total_df)
-print(person_out_df)
-print(person_in_df)
+#print(person_out_df)
+#print(person_in_df)

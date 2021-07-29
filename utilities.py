@@ -6,7 +6,8 @@ import pandas as pd
 from itertools import cycle
 import holidays
 import time
-from numba import jit, njit
+
+np.set_printoptions(threshold=600_000)
 
 
 def truncated_normal(mean, stddev, minval, maxval, size):
@@ -32,10 +33,20 @@ def hour_weights(h, first_peak, second_peak):
     return hour_weights
 
 
-def dwell_time(hour, overall_mean, overall_sd, first_peak, second_peak):
+
+
+
+def dwell_time(event_ts, crowd, overall_mean, overall_sd, first_peak, second_peak):
     # Increase weights compared to timestamp approach to allow for higher mean
     st_time = time.time()
-    wghts = hour_weights(hour, first_peak, second_peak) + 0.5
+    # Hour
+    hour = event_ts.hour
+    # Exponential function
+    h_wghts = hour_weights(hour, first_peak, second_peak) + 0.5
+    # Crowdedness
+    crowdedness_wght = np.sqrt(np.exp(crowd / np.max(crowd)))
+    # Weights
+    wghts = h_wghts * crowdedness_wght
     # dwell times and
     # Stats in ms
     mean = overall_mean * 3_600_000 * wghts
