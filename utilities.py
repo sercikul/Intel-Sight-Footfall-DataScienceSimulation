@@ -7,12 +7,9 @@ from itertools import cycle
 import holidays
 import time
 
-np.set_printoptions(threshold=600_000)
-
 
 def truncated_normal(mean, stddev, minval, maxval, size):
     return np.clip(np.random.normal(mean, stddev, size=size), minval, maxval)
-
 
 
 def get_n_dates(start, end, n):
@@ -31,9 +28,6 @@ def hour_weights(h, first_peak, second_peak):
         -(h - second_peak) ** 2 / (2 * sigma ** 2)) + 0.05
     end_time = time.time()
     return hour_weights
-
-
-
 
 
 def dwell_time(event_ts, crowd, overall_mean, overall_sd, first_peak, second_peak):
@@ -128,7 +122,7 @@ def random_dates(start, end, n, unit):
     step = 0
     while step < len_arr:
         step += 1
-        if step < 15:
+        if step < n:
             current_dt, next_dt = next_dt, next(start_dt)
         else:
             current_dt, next_dt = next_dt, end
@@ -198,6 +192,7 @@ def anom_weight_arr(anom_dt, dt):
     # Concat list to one array and use as mask for whole range
     weight_arr = np.ones(len(dt))
     for anom_seq in anom_dt:
+        # print(anom_seq)
         start = anom_seq[0]
         end = anom_seq[-1]
         peak = start + (end - start) / 2
@@ -213,12 +208,27 @@ def anom_weight_arr(anom_dt, dt):
     return weight_arr
 
 
+def get_month_diff(prev_year, current_year, next_year, current_month, month_peak):
+    # Peak of last year
+    prev_year_diff = (current_year - prev_year) * 12 + (current_month - month_peak)
+    # Peak of this year
+    this_year_diff = current_month - month_peak
+    # Peal of next year
+    next_year_diff = (current_year - next_year) * 12 + (current_month - month_peak)
+
+    return np.minimum.reduce([np.absolute(prev_year_diff),
+                              np.absolute(this_year_diff),
+                              np.absolute(next_year_diff)])
+
+
 def seasonality_factor(first_peak, second_peak, current_month, current_year):
     # In months
     sigma = 2
+    next_year = current_year + 1
+    prev_year = current_year - 1
     # To depict correct month difference in case events are in different years
-    month_diff_1 = (current_year - first_peak[0]) * 12 + (current_month - first_peak[1])
-    month_diff_2 = (current_year - second_peak[0]) * 12 + (current_month - second_peak[1])
+    month_diff_1 = get_month_diff(prev_year, current_year, next_year, current_month, first_peak[1])
+    month_diff_2 = get_month_diff(prev_year, current_year, next_year, current_month, first_peak[1])
     factor = 0.65 * np.exp(-(month_diff_1) ** 2 / (2 * sigma ** 2)) + \
              0.45 * np.exp(-(month_diff_2) ** 2 / (2 * sigma ** 2)) + 0.7
     return factor
@@ -231,7 +241,6 @@ def holidays_in_uk(start_ts, end_ts):
     holiday_lst = [(start + timedelta(days=day)).date() for day in range(n_dates.days + 1) if
                    (start + timedelta(days=day)) in uk_holidays]
     return holiday_lst
-
 
 
 def greedy_split(arr, n, axis=0):
@@ -259,7 +268,7 @@ def greedy_split(arr, n, axis=0):
 
 def weekend_holiday_factor(dt, holidays):
     dt = np.array(dt, dtype="datetime64[D]")
-    #print(len(dt))
+    # print(len(dt))
     is_busday = np.is_busday(dt, holidays=holidays)
     holiday_dt = dt[is_busday == False]
     n_holidays = len(np.unique(holiday_dt))
@@ -276,3 +285,11 @@ def weekend_holiday_factor(dt, holidays):
     # Make customisable when introducing inputs to program
     we_hol_factor = np.where(is_busday, 1, weight_arr)
     return we_hol_factor
+
+
+def weekends(start, end):
+    df = pd.DataFrame({'Dates': pd.date_range(start, end)})
+    busines_dates = pd.bdate_range(start, end)
+    answer = df.loc[~df['Dates'].isin(busines_dates)]
+    weekends = answer["Dates"].astype(str)
+    return weekends.tolist()

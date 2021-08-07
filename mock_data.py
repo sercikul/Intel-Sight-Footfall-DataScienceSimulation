@@ -1,7 +1,7 @@
 # import rapidjson as json
 from numpy.random import choice
-from utilities import *
 import time
+from utilities import *
 
 # Further to-dos
 # Change "deviceID" to "_id"
@@ -123,7 +123,9 @@ def create_df_event(dr, anom_weights, high_seasons: tuple, uk_holidays: list, de
     person_out_ts = pd.to_datetime(out_occurrences, unit='ms')
     df_event_out = pd.DataFrame(person_out_ts, columns=["timestamp"])
     df_event_out['event'] = "personOut"
+    # Cut personOut events that were synthesised for future
     df_event = pd.concat([df_event_in, df_event_out])
+    df_event = df_event.loc[(df_event["timestamp"] <= "now")]
     end_time = time.time()
     print("events time: ", end_time-st_time)
 
@@ -210,7 +212,7 @@ devices = [{"deviceID": "1",
                          "std": 3,
                          "min": -10,
                          "max": 2_000,
-                         "anom_freq": 15,
+                         "anom_freq": 1,
                          "high_season": {(2020, 12), (2021, 2)}}},
 
            {"deviceID": "2",
@@ -238,23 +240,23 @@ devices = [{"deviceID": "1",
                          "dwell_sd": 0.3}}
            ]
 
-start_ts = "2020-06-28"
+start_ts = "2020-08-06"
 end_ts = "now"
 interval_freq = "10S"
 
 # Create the data set
 total_df = synthesise_data(devices, use_cases, start_ts, end_ts)
 
-pd.set_option('display.max_rows', None)
-pd.set_option('display.max_columns', None)
-pd.set_option('display.width', None)
-pd.set_option('display.max_colwidth', -1)
+#pd.set_option('display.max_rows', None)
+#pd.set_option('display.max_columns', None)
+#pd.set_option('display.width', None)
+#pd.set_option('display.max_colwidth', -1)
 
 
 #print(total_df)
 
 
-print(total_df.loc[(total_df["timestamp"] > "2020-11-11 11:00:00") & (total_df["timestamp"] < "2020-11-11 20:00:00")])
+#print(total_df.loc[(total_df["timestamp"] > "2020-11-11 11:00:00") & (total_df["timestamp"] < "2020-11-11 20:00:00")])
 #print(total_df.describe())
 
 #print(total_df.query("20210623 < timestamp < 20210624"))
