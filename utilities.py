@@ -1,11 +1,13 @@
 from datetime import timedelta
 import numpy as np
-import datetime
-from datetime import date
 import pandas as pd
 from itertools import cycle
 import holidays
 import time
+import json
+import collections
+import datetime
+
 
 
 def truncated_normal(mean, stddev, minval, maxval, size):
@@ -27,6 +29,7 @@ def hour_weights(h, first_peak, second_peak):
     hour_weights = 2 * np.exp(-(h - first_peak) ** 2 / (2 * sigma ** 2)) + 1.7 * np.exp(
         -(h - second_peak) ** 2 / (2 * sigma ** 2)) + 0.05
     end_time = time.time()
+    #print(h, hour_weights)
     return hour_weights
 
 
@@ -106,12 +109,10 @@ def anomaly_weights(float_h):
 
 
 # Generate n random dates within time range
-def random_dates(start, end, n, unit):
+def random_dates(start, end, n, freq, unit):
     st_time = time.time()
     np.random.seed(12)
     dr_lst = []
-    float_ts_lst = []
-    start_end_lst = []
     days = (end - start).days
     arr = start + pd.to_timedelta(np.random.randint(0, days * 24, n), unit=unit)
     sorted_arr = arr.sort_values()
@@ -126,7 +127,8 @@ def random_dates(start, end, n, unit):
             current_dt, next_dt = next_dt, next(start_dt)
         else:
             current_dt, next_dt = next_dt, end
-        dr = create_date_range(current_dt, next_dt, "10S")
+        #print(freq)
+        dr = create_date_range(current_dt, next_dt, freq)
         dr_lst.append(dr)
 
     end_time = time.time()
@@ -136,8 +138,9 @@ def random_dates(start, end, n, unit):
 # Generate range from random date
 def create_date_range(start_dt, next_dt, freq):
     st_time = time.time()
+    seconds = int(freq[:-1])
     duration = float(truncated_normal(10, 3, 1, 20, 1))
-    end_dt = min(start_dt + timedelta(hours=duration), next_dt - timedelta(seconds=10))
+    end_dt = min(start_dt + timedelta(hours=duration), next_dt - timedelta(seconds=seconds))
     dr = pd.date_range(start=start_dt, end=end_dt, freq=freq)
     end_time = time.time()
     return dr
@@ -147,12 +150,12 @@ def create_date_range(start_dt, next_dt, freq):
 # Generates an array for timestamp, and tuple (mean, std) for event data.
 
 
-def random_anomaly_generator(dr, start, end, n, unit="H"):
+def random_anomaly_generator(dr, start, end, n, freq, unit="H"):
     st_time = time.time()
     # Regel das mit random seed 10
     start = pd.to_datetime(start)
     end = pd.to_datetime(end)
-    ts = random_dates(start, end, n, unit)
+    ts = random_dates(start, end, n, freq, unit)
     # Weights and normal dist
     weights_h = anom_weight_arr(ts, dr)
     anom_weights = np.clip(weights_h, 1, 50)
@@ -227,8 +230,8 @@ def seasonality_factor(first_peak, second_peak, current_month, current_year):
     next_year = current_year + 1
     prev_year = current_year - 1
     # To depict correct month difference in case events are in different years
-    month_diff_1 = get_month_diff(prev_year, current_year, next_year, current_month, first_peak[1])
-    month_diff_2 = get_month_diff(prev_year, current_year, next_year, current_month, first_peak[1])
+    month_diff_1 = get_month_diff(prev_year, current_year, next_year, current_month, first_peak)
+    month_diff_2 = get_month_diff(prev_year, current_year, next_year, current_month, second_peak)
     factor = 0.65 * np.exp(-(month_diff_1) ** 2 / (2 * sigma ** 2)) + \
              0.45 * np.exp(-(month_diff_2) ** 2 / (2 * sigma ** 2)) + 0.7
     return factor
@@ -293,3 +296,94 @@ def weekends(start, end):
     answer = df.loc[~df['Dates'].isin(busines_dates)]
     weekends = answer["Dates"].astype(str)
     return weekends.tolist()
+
+
+
+# DATABASE UTILS
+class CustomEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        else:
+            return super(CustomEncoder, self).default(obj)
+
+def preprocess_for_mongo(ff_data):
+    for rec in ff_data:
+        rec["timestamp"] = rec["timestamp"].to_pydatetime().isoformat()
+    data_dict = json.dumps(ff_data, cls=CustomEncoder)
+    data = json.loads(data_dict)
+
+    return data
+
+
+def retrieve_from_mongo(collection):
+    data = collection.find()
+    df = pd.DataFrame.from_records(data)
+    df = df.drop(columns="_id")
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    return df
+
+
+def yes_no(question):
+    """
+    Function for user to answer a yes/no question.
+
+
+    Parameters:
+        (str) question: A question which provides context on why the yes/no question is asked.
+
+    Returns:
+        (str) choice: the choice of the user, either 'y' or 'n'
+    """
+    # Outputs 'y' or 'n' as a string, or prompts the user for another choice
+    while True:
+        choice = str(input(
+            f"{str(question)} Yes or No? Please type y for yes, n for No: ").strip().lower())
+        acceptable_inputs = ['yes', 'no', 'nah',
+                             'yeh', 'nope', 'yeah', 'y', 'n']
+        if choice in acceptable_inputs:
+            choice = choice[:1]
+            return choice
+        else:
+            print(f'{choice} is an invalid input! Please enter either y or n')
+            continue
+
+
+def exception_handler_id(user_input: str, dataframe):
+    """
+    Function to handle user input, when user needs to input an integer found in the index of the data frame
+
+    Parameters:
+        (str) user_input
+        (df) dataframe
+
+    Returns:
+        (int) Integer of user input, if in data frame index
+        (str) A string saying the input is "Invalid", if user input not in data frame
+    """
+    try:
+        if int(user_input) not in dataframe.index:
+            raise ValueError
+        return int(user_input)
+    except ValueError:
+        retry = yes_no("\nYou did not enter a valid number. You must select a number that appears in the list, "
+                       "would you like to try again?")
+        if retry == 'y':
+            new_input = input(
+                "\nPlease select one number from the left hand side of the overview: ")
+            return exception_handler_id(new_input, dataframe)
+        else:
+            return "Invalid"
+
+
+# Insert new data set to mongodb
+def insert_to_mongodb(total_df, collection):
+    data = preprocess_for_mongo(total_df)
+    collection.delete_many({})
+    collection.insert_many(data)
+    collection.update_many({}, [{'$set': {'timestamp': {'$toDate': '$timestamp'}}}])
+    return True

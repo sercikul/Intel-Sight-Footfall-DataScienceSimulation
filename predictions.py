@@ -1,9 +1,13 @@
 # Time Series Predictions - SKTIME
 
 # %matplotlib inline
-from mock_data import *
+#from mock_data import *
 from pred_utils import *
 
+# Remove later when these information are in the db
+use_cases = {"1": "queueing",
+             "2": "freeSeats",
+             "3": "event"}
 
 # Time Series Forecasts
 
@@ -31,12 +35,11 @@ def predict_future(total_df):
             y_uc[y_uc == "personIn"] = 1
             y_uc[y_uc == "personOut"] = -1
             y_uc["event"] = pd.to_numeric(np.cumsum(y_uc["event"]))
-            # Sum Footfall
-            y = y_uc.groupby(pd.Grouper(freq="60Min")).aggregate(np.mean)
-        else:
-            y = y_uc.groupby(pd.Grouper(freq="60Min")).aggregate(np.mean)
 
+        # Sum Footfall
+        y = y_uc.groupby(pd.Grouper(freq="60Min")).aggregate(np.mean)
         y.columns = ["y"]
+        y["y"] = y["y"].fillna(0)
         y["y"] = y["y"].astype(float)
         y = pd.Series(y["y"])
         # Handle anomalies
@@ -77,10 +80,7 @@ def predict_future(total_df):
     y_pred_df_total = y_pred_df_total.sort_values(["timestamp", "deviceID"], ascending=(True, True))
     y_pred_df_total = y_pred_df_total.reset_index(drop=True)
 
+    # 11. Make dictionary
+    y_pred_df_total = y_pred_df_total.to_dict("records")
+
     return y_pred_df_total
-
-
-
-y_pred = predict_future(total_df)
-
-print(y_pred)

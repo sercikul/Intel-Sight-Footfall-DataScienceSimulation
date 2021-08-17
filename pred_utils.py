@@ -111,7 +111,7 @@ def optimisation_result(optimisation, param_space, calls):
                          n_calls=calls,
                          n_initial_points=calls,
                          verbose=10,
-                         n_jobs=-1)
+                         n_jobs=2)
     return result
 
 
@@ -130,7 +130,7 @@ def ensemble_predictions(prophet_params, naive_params, fh, y_log):
     mse = MeanSquaredError()
     forecaster_param_grid = {"selected_forecaster": ["fbprophet", "naive"]}
     gscv = ForecastingGridSearchCV(forecaster, cv=cv, param_grid=forecaster_param_grid,
-                                   verbose=10, n_jobs=-1, scoring=mse)
+                                   verbose=10, n_jobs=2, scoring=mse)
 
     # Fit and Predict
     gscv.fit(y_log)
