@@ -31,7 +31,8 @@ def main_script():
               "seasonality.\n")
         print(tabulate(options_df, tablefmt='pretty', headers='keys'))
         print("")
-        input_number = input("Please select an option by the index number (e.g. '0'): ")
+        input_number = input("Please select an option that matches the specifics of your venue using the index number "
+                             "(e.g. '0'): ")
         user_choice = exception_handler_id(input_number, options_df)
         if user_choice == "Invalid":
             print("\n")
