@@ -10,21 +10,18 @@ def main_script():
     print("\nWelcome to the Sight++ Footfall Predictor !\n")
 
     # Retrieve all default scenarios
-    options_dict = {"Option": [], "Yearly Seasonality": [], "Weekly Seasonality": [], "Daily Seasonality": [],
-                    "Only Business Days": []}
+    options_dict = {"Option": [], "Yearly Seasonality": [], "Weekly Seasonality": [], "Daily Seasonality": []}
     while True:
         for option in scenarios:
             # Retrieve parameters
             yearly_seasonality = scenarios[option]["Yearly Seasonality"]
             weekly_seasonality = scenarios[option]["Weekly Seasonality"]
             daily_seasonality = scenarios[option]["Daily Seasonality"]
-            only_bd = scenarios[option]["Only Business Days"]
             # Append to dictionary
             options_dict["Option"].append(option)
             options_dict["Yearly Seasonality"].append(yearly_seasonality)
             options_dict["Weekly Seasonality"].append(weekly_seasonality)
             options_dict["Daily Seasonality"].append(daily_seasonality)
-            options_dict["Only Business Days"].append(only_bd)
 
         options_df = pd.DataFrame(options_dict)
         print("\nThe table below lists several mock data sets including information about "
@@ -44,26 +41,30 @@ def main_script():
                   f"This may take a few moments..\n")
             devices = scenario_devices[selected_option]
             total_df = synthesise_data(devices, use_cases, start_ts, end_ts)
-            # WORKS: insert_to_mongodb(total_df, collection_ff)
-
+            # Insert data and selected scenario settings to database
+            insert_to_mongodb(total_df, collection_ff, db)
+            insert_to_mongodb(devices, collection_scenario, db)
             print(f"\nHistorical data has been synthesised and is now used by machine learning algorithms to predict"
                   f" footfall 2 months ahead from now. Please, do not terminate the program.\nIn the meantime, you can"
                   f" analyse your data in the 'Historical Footfall' and 'Real-Time Footfall' sections of your MongoDB"
                   f" dashboard.\n")
 
-            historical_data = retrieve_from_mongo(collection_ff)
-            predictions = predict_future(historical_data)
-            # WORKS: insert_to_mongodb(predictions, collection_preds)
+            historical_data = retrieve_from_mongo(collection_ff, db)
+            predictions = create_future_data(historical_data)
+            insert_to_mongodb(predictions, collection_preds, db)
             print(f"\nTime series forecasting has now been completed and is ready for analysis in the 'Predictive"
                   f" Footfall' section of your MongoDB dashboard.\n")
+
             break
 
     return True
 
 
 if __name__ == "__main__":
-    cluster = MongoClient("INSERT CONNECTION STRING HERE")
+    cluster = MongoClient("mongodb+srv://sightpp:UCLSightPP2021@sightcluster.ea126.mongodb.net/myFirstDatabase"
+                          "?retryWrites=true&w=majority")
     db = cluster["sight"]
     collection_ff = db["footfall"]
     collection_preds = db["predictions"]
+    collection_scenario = db["scenario"]
     main_script()

@@ -9,10 +9,13 @@ import collections
 import datetime
 
 
-
 def truncated_normal(mean, stddev, minval, maxval, size):
     return np.clip(np.random.normal(mean, stddev, size=size), minval, maxval)
 
+
+def dwell_normal(mean, stddev, minval, maxval, size):
+    np.random.seed(12)
+    return np.clip(np.random.normal(mean, stddev, size=size), minval, maxval)
 
 def get_n_dates(start, end, n):
     start_u = start.value // (10 ** 9 // 1_000)
@@ -29,7 +32,7 @@ def hour_weights(h, first_peak, second_peak):
     hour_weights = 2 * np.exp(-(h - first_peak) ** 2 / (2 * sigma ** 2)) + 1.7 * np.exp(
         -(h - second_peak) ** 2 / (2 * sigma ** 2)) + 0.05
     end_time = time.time()
-    #print(h, hour_weights)
+    # print(h, hour_weights)
     return hour_weights
 
 
@@ -127,7 +130,7 @@ def random_dates(start, end, n, freq, unit):
             current_dt, next_dt = next_dt, next(start_dt)
         else:
             current_dt, next_dt = next_dt, end
-        #print(freq)
+        # print(freq)
         dr = create_date_range(current_dt, next_dt, freq)
         dr_lst.append(dr)
 
@@ -298,7 +301,6 @@ def weekends(start, end):
     return weekends.tolist()
 
 
-
 # DATABASE UTILS
 class CustomEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -311,20 +313,29 @@ class CustomEncoder(json.JSONEncoder):
         else:
             return super(CustomEncoder, self).default(obj)
 
-def preprocess_for_mongo(ff_data):
-    for rec in ff_data:
-        rec["timestamp"] = rec["timestamp"].to_pydatetime().isoformat()
-    data_dict = json.dumps(ff_data, cls=CustomEncoder)
+
+def preprocess_for_mongo(data):
+    for rec in data:
+        if "timestamp" in rec:
+            rec["timestamp"] = rec["timestamp"].to_pydatetime().isoformat()
+    data_dict = json.dumps(data, cls=CustomEncoder)
     data = json.loads(data_dict)
 
     return data
 
 
-def retrieve_from_mongo(collection):
-    data = collection.find()
-    df = pd.DataFrame.from_records(data)
-    df = df.drop(columns="_id")
-    df["timestamp"] = pd.to_datetime(df["timestamp"])
+def retrieve_from_mongo(collection, db):
+    if collection != db["scenario"]:
+        data = collection.find()
+        df = pd.DataFrame.from_records(data)
+        df = df.drop(columns="_id")
+        df["timestamp"] = pd.to_datetime(df["timestamp"])
+    else:
+        data = collection.find()
+        df = []
+        for device in data:
+            device.pop("_id")
+            df.append(device)
     return df
 
 
@@ -381,9 +392,12 @@ def exception_handler_id(user_input: str, dataframe):
 
 
 # Insert new data set to mongodb
-def insert_to_mongodb(total_df, collection):
+def insert_to_mongodb(total_df, collection, db, update=None):
     data = preprocess_for_mongo(total_df)
-    collection.delete_many({})
+    if not update:
+        collection.delete_many({})
     collection.insert_many(data)
-    collection.update_many({}, [{'$set': {'timestamp': {'$toDate': '$timestamp'}}}])
+    if collection != db["scenario"]:
+        collection.update_many({}, [{'$set': {'timestamp': {'$toDate': '$timestamp'}}}])
     return True
+

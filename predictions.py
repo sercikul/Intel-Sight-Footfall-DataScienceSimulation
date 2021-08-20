@@ -1,7 +1,7 @@
 # Time Series Predictions - SKTIME
 
 # %matplotlib inline
-#from mock_data import *
+# from mock_data import *
 from pred_utils import *
 
 # Remove later when these information are in the db
@@ -9,9 +9,10 @@ use_cases = {"1": "queueing",
              "2": "freeSeats",
              "3": "event"}
 
+
 # Time Series Forecasts
 
-def predict_future(total_df):
+def create_future_data(total_df):
     # General variables: fh (pre-specified)
     device_lst = []
     # Forecasting Horizon (2 months = 1460 h)
@@ -42,6 +43,7 @@ def predict_future(total_df):
         y["y"] = y["y"].fillna(0)
         y["y"] = y["y"].astype(float)
         y = pd.Series(y["y"])
+        print(y[y == -1])
         # Handle anomalies
         y_ = anomaly_handler(y, uc)
         # plot_series(y_)

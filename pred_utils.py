@@ -162,3 +162,4 @@ def anomaly_handler(y, use_case):
             y_no_anom[i] = upper
         # print(y_outliers[i])
     return y_no_anom
+

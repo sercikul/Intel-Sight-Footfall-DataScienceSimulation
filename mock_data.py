@@ -4,6 +4,8 @@ import time
 from utilities import *
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
+import sys
+np.set_printoptions(threshold=sys.maxsize)
 
 
 
@@ -103,7 +105,7 @@ def create_df_event(dr, anom_weights, uk_holidays: list, device: dict):
 
     # Average dwell statistics
     dw_hour_mean, dw_hour_sd = dwell_time(person_in_ts, crowd, dwell_mean, dwell_sd, first_pk, second_pk)
-    dwell_time_ms = truncated_normal(dw_hour_mean, dw_hour_sd, 1000, (100 * 3_600_000), size=len(person_in_ts))
+    dwell_time_ms = dwell_normal(dw_hour_mean, dw_hour_sd, 1000, (100 * 3_600_000), size=len(person_in_ts))
     out_occurrences = person_in_ts + dwell_time_ms.astype('timedelta64[ms]')
     person_out_ts = pd.to_datetime(out_occurrences, unit='ms')
     df_event_out = pd.DataFrame(person_out_ts, columns=["timestamp"])
@@ -123,7 +125,7 @@ def create_df_event(dr, anom_weights, uk_holidays: list, device: dict):
 # Synthesise data for use cases 1 and 2.
 
 # CLARIFY IF ONE DEVICEID FOR ONE TARGET
-def synthesise_data(devices: list, use_cases: dict, start_ts: str, end_ts: str):
+def synthesise_data(devices: list, use_cases: dict, start_ts: str, end_ts: str, update_ts=None):
     st_time = time.time()
     device_lst = []
     # English Bank Holidays
@@ -142,7 +144,11 @@ def synthesise_data(devices: list, use_cases: dict, start_ts: str, end_ts: str):
         freq_ts = device["freq_ts"]
         ts = pd.date_range(start=start_ts, end=end_ts, freq=freq_ts)
         # Create anomalies
-        anom_weights = random_anomaly_generator(ts, start_ts, end_ts, ff_anom, freq_ts)
+        # Check what happens if you set anom to 0
+        if ff_anom > 0:
+            anom_weights = random_anomaly_generator(ts, start_ts, end_ts, ff_anom, freq_ts)
+        else:
+            anom_weights = 1
         # If not event-based.
         if use_case != "event":
             # Concatenate low and peak times
@@ -156,6 +162,11 @@ def synthesise_data(devices: list, use_cases: dict, start_ts: str, end_ts: str):
 
         # Append device-specific df to device_lst
         df = df.sort_values(["timestamp", "deviceID"], ascending=(True, True))
+        # If exisitng data is updated, then the most recently collected datetime 'updated_ts' is
+        # passed as parameter and the updated mock data is filtered, such that it only contains
+        # data from the most recent datetime onwards until now.
+        if update_ts:
+            df = df[df["timestamp"] > update_ts]
         device_lst += df.to_dict("records")
 
     df_total = device_lst
