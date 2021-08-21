@@ -402,27 +402,9 @@ def insert_to_mongodb(total_df, collection, db, update=None):
     if not update:
         collection.delete_many({})
     collection.insert_many(data)
-    if collection != db["scenario"]:
+    if collection != db["scenario"] or collection != db["devices"]:
         collection.update_many({}, [{'$set': {'timestamp': {'$toDate': '$timestamp'}}}])
     return True
 
-
-# Cumulative Visitor Count
-
-def cumulative_visitor_count(event_df):
-    # Filter dataframe for events
-    event = event_df.reindex(["timestamp", "event"], axis=1)
-    event = event.set_index("timestamp")
-    event[event == "personIn"] = 1
-    event[event == "personOut"] = -1
-    event["event"] = pd.to_numeric(np.cumsum(event["event"]))
-
-    # Sum Footfall
-    cum_visitors = event.groupby(pd.Grouper(freq="60Min")).aggregate(np.mean)
-    cum_visitors["event"] = cum_visitors["event"].fillna(0)
-    cum_visitors["event"] = cum_visitors["event"].astype(float)
-
-    cum_visitors = cum_visitors.to_dict("records")
-    return cum_visitors
 
 

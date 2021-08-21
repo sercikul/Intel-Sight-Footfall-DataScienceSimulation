@@ -44,7 +44,6 @@ def main_script():
             devices = device_info[selected_option]
             # Insert data and selected scenario settings to database
             insert_to_mongodb(total_df, collection_ff, db)
-            insert_to_mongodb(cum_visitors, collection_visits, db)
             print(f"\nHistorical data has been synthesised and is now used by machine learning algorithms to predict"
                   f" footfall 2 months ahead from now. Please, do not terminate the program.\nIn the meantime, you can"
                   f" analyse your data in the 'Historical Footfall' and 'Real-Time Footfall' sections of your MongoDB"
@@ -70,5 +69,4 @@ if __name__ == "__main__":
     collection_preds = db["predictions"]
     collection_scenario = db["scenario"]
     collection_devices = db["devices"]
-    collection_visits = db["cumVisitCount"]
     main_script()

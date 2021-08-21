@@ -114,11 +114,7 @@ def create_df_event(dr, anom_weights, uk_holidays: list, scenario: dict):
     end_time = time.time()
     # print("events time: ", end_time-st_time)
 
-
-    # Cumulative Visitor Count
-    cum_visitors = cumulative_visitor_count(df_event)
-
-    return df_event, cum_visitors
+    return df_event
 
 
 # Specify scenario, start, end as well as frequency of time series
@@ -130,7 +126,6 @@ def create_df_event(dr, anom_weights, uk_holidays: list, scenario: dict):
 def synthesise_data(scenarios: list, use_cases: dict, start_ts: str, end_ts: str, update_ts=None):
     st_time = time.time()
     scenario_lst = []
-    cum_visitor_lst = []
     # English Bank Holidays
     uk_holidays = holidays_in_uk(start_ts, end_ts)
     # scenarios for loop
@@ -158,7 +153,6 @@ def synthesise_data(scenarios: list, use_cases: dict, start_ts: str, end_ts: str
             df = create_df_timestamp(ts, scenario, anom_weights, uk_holidays, use_case)
         else:
             df, cum_visitors = create_df_event(ts, anom_weights, uk_holidays, scenario)
-            cum_visitor_lst += cum_visitors
 
         # Bring in other attributes
         df['recordType'] = record_type
@@ -175,9 +169,8 @@ def synthesise_data(scenarios: list, use_cases: dict, start_ts: str, end_ts: str
 
     df_total = scenario_lst
     end_time = time.time()
-    # print("overall time: ", end_time - st_time)
 
-    return df_total, cum_visitor_lst
+    return df_total
 
 # Parameters
 # Execute
