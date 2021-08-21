@@ -26,9 +26,8 @@ def create_future_data(total_df):
         # 4. Pre-Process data for all (if "event": pass in function to process)
         y_uc = total_df[total_df["deviceID"] == i]
         # Get use case
-        uc_arr = y_uc["targetID"].unique()
+        uc_arr = y_uc["recordType"].unique()
         record_type = uc_arr[0]
-        print(record_type)
         uc = use_cases[record_type]
         y_uc = y_uc.reindex(["timestamp", uc], axis=1)
         # Make data univariate for forecasts and in 1 hour intervals

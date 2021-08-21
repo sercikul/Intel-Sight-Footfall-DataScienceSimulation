@@ -1,5 +1,5 @@
 from mock_data import *
-from default_devices import *
+from default_scenarios import *
 from utilities import *
 from tabulate import tabulate
 from pymongo import MongoClient
@@ -13,10 +13,10 @@ def main_script():
     options_dict = {"Option": [], "Yearly Seasonality": [], "Weekly Seasonality": [], "Daily Seasonality": []}
     while True:
         for option in scenarios:
-            # Retrieve parameters
-            yearly_seasonality = scenarios[option]["Yearly Seasonality"]
-            weekly_seasonality = scenarios[option]["Weekly Seasonality"]
-            daily_seasonality = scenarios[option]["Daily Seasonality"]
+            # Retrieve seasonality parameters
+            yearly_seasonality = scenario_seasonality[option]["Yearly Seasonality"]
+            weekly_seasonality = scenario_seasonality[option]["Weekly Seasonality"]
+            daily_seasonality = scenario_seasonality[option]["Daily Seasonality"]
             # Append to dictionary
             options_dict["Option"].append(option)
             options_dict["Yearly Seasonality"].append(yearly_seasonality)
@@ -39,16 +39,18 @@ def main_script():
             selected_option = options_df.loc[user_choice][0]
             print(f"\nThe Sight++ Footfall Predictor is currently creating the data set for {selected_option}.\n"
                   f"This may take a few moments..\n")
-            devices = scenario_devices[selected_option]
-            total_df = synthesise_data(devices, use_cases, start_ts, end_ts)
+            scenario = scenarios[selected_option]
+            total_df, cum_visitors = synthesise_data(scenario, use_cases, start_ts, end_ts)
+            devices = device_info[selected_option]
             # Insert data and selected scenario settings to database
             insert_to_mongodb(total_df, collection_ff, db)
-            insert_to_mongodb(devices, collection_scenario, db)
+            insert_to_mongodb(cum_visitors, collection_visits, db)
             print(f"\nHistorical data has been synthesised and is now used by machine learning algorithms to predict"
                   f" footfall 2 months ahead from now. Please, do not terminate the program.\nIn the meantime, you can"
                   f" analyse your data in the 'Historical Footfall' and 'Real-Time Footfall' sections of your MongoDB"
                   f" dashboard.\n")
-
+            insert_to_mongodb(scenario, collection_scenario, db)
+            insert_to_mongodb(devices, collection_devices, db)
             historical_data = retrieve_from_mongo(collection_ff, db)
             predictions = create_future_data(historical_data)
             insert_to_mongodb(predictions, collection_preds, db)
@@ -67,4 +69,6 @@ if __name__ == "__main__":
     collection_ff = db["footfall"]
     collection_preds = db["predictions"]
     collection_scenario = db["scenario"]
+    collection_devices = db["devices"]
+    collection_visits = db["cumVisitCount"]
     main_script()

@@ -1,5 +1,5 @@
 from mock_data import *
-from default_devices import *
+from default_scenarios import *
 from utilities import *
 from tabulate import tabulate
 from pymongo import MongoClient
@@ -24,13 +24,13 @@ from predictions import *
 def update():
     # Retrieve data and saved device settings of selected scenario from mongodb
     data = retrieve_from_mongo(collection_ff, db)
-    devices = retrieve_from_mongo(collection_scenario, db)
+    scenario = retrieve_from_mongo(collection_scenario, db)
     # Get last interval-based timestamp
     start_ts = data["timestamp"].min()
     # Most recent timestamp in data set
     last_ts = data["timestamp"].max()
     end_ts = "now"
-    update_df = synthesise_data(devices, use_cases, start_ts, end_ts, update_ts=last_ts)
+    update_df = synthesise_data(scenario, use_cases, start_ts, end_ts, update_ts=last_ts)
     insert_to_mongodb(update_df, collection_ff, db, update=True)
     # Get updated historical data
     historical_data = retrieve_from_mongo(collection_ff, db)

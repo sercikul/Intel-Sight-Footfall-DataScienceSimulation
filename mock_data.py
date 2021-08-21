@@ -6,17 +6,17 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
 
-def create_df_timestamp(ts, device: dict, anom_weights, uk_holidays: list, use_case: str):
-    # Footfall statistics from device dict
-    ff_mean = device["footfall"]["mean"]
-    ff_std = device["footfall"]["std"]
-    ff_min = device["footfall"]["min"]
-    ff_max = device["footfall"]["max"]
-    ff_peak = device["footfall"]["peak_times"]
-    ff_higher_wd = device["footfall"]["higher_weekdays"]
+def create_df_timestamp(ts, scenario: dict, anom_weights, uk_holidays: list, use_case: str):
+    # Footfall statistics from scenario dict
+    ff_mean = scenario["footfall"]["mean"]
+    ff_std = scenario["footfall"]["std"]
+    ff_min = scenario["footfall"]["min"]
+    ff_max = scenario["footfall"]["max"]
+    ff_peak = scenario["footfall"]["peak_times"]
+    ff_higher_wd = scenario["footfall"]["higher_weekdays"]
     first_pk, second_pk = ff_peak[0], ff_peak[1]
     # Seasonality statistcs
-    first_seasonal_pk, second_seasonal_pk = device["footfall"]["high_season"][0], device["footfall"]["high_season"][1]
+    first_seasonal_pk, second_seasonal_pk = scenario["footfall"]["high_season"][0], scenario["footfall"]["high_season"][1]
     # Initialise df
     df = pd.DataFrame(ts, columns=["timestamp"])
 
@@ -44,24 +44,24 @@ def create_df_timestamp(ts, device: dict, anom_weights, uk_holidays: list, use_c
 # Create array with 0 to 24 for every day inside range
 # Create normal dist of frequency for each hour
 
-def create_df_event(dr, anom_weights, uk_holidays: list, device: dict):
+def create_df_event(dr, anom_weights, uk_holidays: list, scenario: dict):
     # Initialise df list
     st_time = time.time()
     # Random seed for consistency
     np.random.seed(12)
-    # Footfall statistics from device dict
-    ff_mean = device["footfall"]["mean"]
-    ff_std = device["footfall"]["std"]
-    ff_min = device["footfall"]["min"]
-    ff_max = device["footfall"]["max"]
-    ff_peak = device["footfall"]["peak_times"]
-    ff_higher_wd = device["footfall"]["higher_weekdays"]
+    # Footfall statistics from scenario dict
+    ff_mean = scenario["footfall"]["mean"]
+    ff_std = scenario["footfall"]["std"]
+    ff_min = scenario["footfall"]["min"]
+    ff_max = scenario["footfall"]["max"]
+    ff_peak = scenario["footfall"]["peak_times"]
+    ff_higher_wd = scenario["footfall"]["higher_weekdays"]
     first_pk, second_pk = ff_peak[0], ff_peak[1]
     # Seasonality statistics
-    first_seasonal_pk, second_seasonal_pk = device["footfall"]["high_season"][0], device["footfall"]["high_season"][1]
+    first_seasonal_pk, second_seasonal_pk = scenario["footfall"]["high_season"][0], scenario["footfall"]["high_season"][1]
     # Dwell data
-    dwell_mean = device["footfall"]["dwell_mean"]
-    dwell_sd = device["footfall"]["dwell_sd"]
+    dwell_mean = scenario["footfall"]["dwell_mean"]
+    dwell_sd = scenario["footfall"]["dwell_sd"]
     # Specify name of use case column
     use_case = "event"
     dr_h = dr.hour + (dr.minute / 60)
@@ -114,32 +114,37 @@ def create_df_event(dr, anom_weights, uk_holidays: list, device: dict):
     end_time = time.time()
     # print("events time: ", end_time-st_time)
 
-    return df_event
+
+    # Cumulative Visitor Count
+    cum_visitors = cumulative_visitor_count(df_event)
+
+    return df_event, cum_visitors
 
 
-# Specify devices, start, end as well as frequency of time series
+# Specify scenario, start, end as well as frequency of time series
 # Interval - timestamp approach.
 
 # Synthesise data for use cases 1 and 2.
 
-# CLARIFY IF ONE DEVICEID FOR ONE TARGET
-def synthesise_data(devices: list, use_cases: dict, start_ts: str, end_ts: str, update_ts=None):
+# CLARIFY IF ONE DEVICEID FOR ONE Record Type
+def synthesise_data(scenarios: list, use_cases: dict, start_ts: str, end_ts: str, update_ts=None):
     st_time = time.time()
-    device_lst = []
+    scenario_lst = []
+    cum_visitor_lst = []
     # English Bank Holidays
     uk_holidays = holidays_in_uk(start_ts, end_ts)
-    # Devices for loop
+    # scenarios for loop
 
-    for device in devices:
+    for scenario in scenarios:
         # Seasonality
         # Id's
-        target_id = device["useCase"]
-        device_id = device["deviceID"]
-        use_case = use_cases[target_id]
+        record_type = scenario["useCase"]
+        device_id = scenario["_id"]
+        use_case = use_cases[record_type]
         # FF anomalies
-        ff_anom = device["footfall"]["anom_freq"]
+        ff_anom = scenario["footfall"]["anom_freq"]
         # Ts Freq
-        freq_ts = device["freq_ts"]
+        freq_ts = scenario["freq_ts"]
         ts = pd.date_range(start=start_ts, end=end_ts, freq=freq_ts)
         # Create anomalies
         # Check what happens if you set anom to 0
@@ -150,28 +155,29 @@ def synthesise_data(devices: list, use_cases: dict, start_ts: str, end_ts: str, 
         # If not event-based.
         if use_case != "event":
             # Concatenate low and peak times
-            df = create_df_timestamp(ts, device, anom_weights, uk_holidays, use_case)
+            df = create_df_timestamp(ts, scenario, anom_weights, uk_holidays, use_case)
         else:
-            df = create_df_event(ts, anom_weights, uk_holidays, device)
+            df, cum_visitors = create_df_event(ts, anom_weights, uk_holidays, scenario)
+            cum_visitor_lst += cum_visitors
 
         # Bring in other attributes
-        df['targetID'] = target_id
+        df['recordType'] = record_type
         df['deviceID'] = device_id
 
-        # Append device-specific df to device_lst
+        # Append device-specific df to scenario_lst
         df = df.sort_values(["timestamp", "deviceID"], ascending=(True, True))
         # If exisitng data is updated, then the most recently collected datetime 'updated_ts' is
         # passed as parameter and the updated mock data is filtered, such that it only contains
         # data from the most recent datetime onwards until now.
         if update_ts:
             df = df[df["timestamp"] > update_ts]
-        device_lst += df.to_dict("records")
+        scenario_lst += df.to_dict("records")
 
-    df_total = device_lst
+    df_total = scenario_lst
     end_time = time.time()
     # print("overall time: ", end_time - st_time)
 
-    return df_total
+    return df_total, cum_visitor_lst
 
 # Parameters
 # Execute
