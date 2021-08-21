@@ -22,16 +22,19 @@ def create_future_data(total_df):
     device_arr = pd.unique(devices)
     # 2. Loop through devices
     for i in device_arr:
-        uc = use_cases[i]
         # 3. Filter dataframe for device and respective use case
         # 4. Pre-Process data for all (if "event": pass in function to process)
         y_uc = total_df[total_df["deviceID"] == i]
+        # Get use case
+        uc_arr = y_uc["targetID"].unique()
+        record_type = uc_arr[0]
+        print(record_type)
+        uc = use_cases[record_type]
         y_uc = y_uc.reindex(["timestamp", uc], axis=1)
         # Make data univariate for forecasts and in 1 hour intervals
         y_uc = y_uc.set_index("timestamp")
         if uc == "event":
             # Person enters +1, Person leaves -1
-
             # Create numpy array of length y_uc. Do cumulative sum.
             y_uc[y_uc == "personIn"] = 1
             y_uc[y_uc == "personOut"] = -1
@@ -43,7 +46,6 @@ def create_future_data(total_df):
         y["y"] = y["y"].fillna(0)
         y["y"] = y["y"].astype(float)
         y = pd.Series(y["y"])
-        print(y[y == -1])
         # Handle anomalies
         y_ = anomaly_handler(y, uc)
         # plot_series(y_)

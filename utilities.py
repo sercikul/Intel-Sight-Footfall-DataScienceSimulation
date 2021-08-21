@@ -272,7 +272,7 @@ def greedy_split(arr, n, axis=0):
     return np.split(arr, ix, axis)
 
 
-def weekend_holiday_factor(dt, holidays):
+def weekend_holiday_factor(dt, holidays, higher_weekdays):
     dt = np.array(dt, dtype="datetime64[D]")
     # print(len(dt))
     is_busday = np.is_busday(dt, holidays=holidays)
@@ -285,7 +285,12 @@ def weekend_holiday_factor(dt, holidays):
     for i in range(len(hol_arr)):
         day_seq = hol_arr[i]
         mask = np.isin(dt, day_seq[0])
-        random_weight = truncated_normal(0.75, 0.05, 0.5, 0.8, size=1)
+        # If venue has higher footfall on weekdays, then the factor for weekends should be
+        # below 1.
+        if higher_weekdays:
+            random_weight = truncated_normal(0.75, 0.05, 0.5, 0.8, size=1)
+        else:
+            random_weight = truncated_normal(1.25, 0.05, 1.1, 1.5, size=1)
         day_factor = np.where(mask, random_weight, 1)
         weight_arr *= day_factor
     # Make customisable when introducing inputs to program
