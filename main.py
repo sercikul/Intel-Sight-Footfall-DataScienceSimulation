@@ -40,7 +40,7 @@ def main_script():
             print(f"\nThe Sight++ Footfall Predictor is currently creating the data set for {selected_option}.\n"
                   f"This may take a few moments..\n")
             scenario = scenarios[selected_option]
-            total_df, cum_visitors = synthesise_data(scenario, use_cases, start_ts, end_ts)
+            total_df = synthesise_data(scenario, use_cases, start_ts, end_ts)
             devices = device_info[selected_option]
             # Insert data and selected scenario settings to database
             insert_to_mongodb(total_df, collection_ff, db)

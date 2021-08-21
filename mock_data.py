@@ -152,7 +152,7 @@ def synthesise_data(scenarios: list, use_cases: dict, start_ts: str, end_ts: str
             # Concatenate low and peak times
             df = create_df_timestamp(ts, scenario, anom_weights, uk_holidays, use_case)
         else:
-            df, cum_visitors = create_df_event(ts, anom_weights, uk_holidays, scenario)
+            df = create_df_event(ts, anom_weights, uk_holidays, scenario)
 
         # Bring in other attributes
         df['recordType'] = record_type
