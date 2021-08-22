@@ -62,8 +62,7 @@ def main_script():
 
 
 if __name__ == "__main__":
-    cluster = MongoClient("mongodb+srv://sightpp:UCLSightPP2021@sightcluster.ea126.mongodb.net/myFirstDatabase"
-                          "?retryWrites=true&w=majority")
+    cluster = MongoClient("mongodb://localhost:27017/?readPreference=primary&appname=MongoDB%20Compass&directConnection=true&ssl=false")
     db = cluster["sight"]
     collection_ff = db["footfall"]
     collection_preds = db["predictions"]
