@@ -44,6 +44,7 @@ def main_script():
             devices = device_info[selected_option]
             # Insert data and selected scenario settings to database
             insert_to_mongodb(total_df, collection_ff, db)
+            cum_visitor_count(collection_ff)
             print(f"\nHistorical data has been synthesised and is now used by machine learning algorithms to predict"
                   f" footfall 2 months ahead from now. Please, do not terminate the program.\nIn the meantime, you can"
                   f" analyse your data in the 'Historical Footfall' and 'Real-Time Footfall' sections of your MongoDB"
@@ -62,7 +63,9 @@ def main_script():
 
 
 if __name__ == "__main__":
-    cluster = MongoClient("mongodb://localhost:27017/?readPreference=primary&appname=MongoDB%20Compass&directConnection=true&ssl=false")
+    cluster = MongoClient("mongodb+srv://sightpp:UCLSightPP2021@sightcluster.ea126.mongodb.net/myFirstDatabase"
+                          "?retryWrites=true&w=majority")
+
     db = cluster["sight"]
     collection_ff = db["footfall"]
     collection_preds = db["predictions"]

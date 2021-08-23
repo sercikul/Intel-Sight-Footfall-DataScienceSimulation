@@ -17,6 +17,7 @@ def dwell_normal(mean, stddev, minval, maxval, size):
     np.random.seed(12)
     return np.clip(np.random.normal(mean, stddev, size=size), minval, maxval)
 
+
 def get_n_dates(start, end, n):
     start_u = start.value // (10 ** 9 // 1_000)
     end_u = end.value // (10 ** 9 // 1_000)
@@ -336,11 +337,7 @@ def retrieve_from_mongo(collection, db):
         df = df.drop(columns="_id")
         df["timestamp"] = pd.to_datetime(df["timestamp"])
     else:
-        data = collection.find()
-        df = []
-        for scenario in data:
-            scenario.pop("_id")
-            df.append(scenario)
+        df = collection.find()
     return df
 
 
@@ -402,9 +399,103 @@ def insert_to_mongodb(total_df, collection, db, update=None):
     if not update:
         collection.delete_many({})
     collection.insert_many(data)
-    if collection != db["scenario"] or collection != db["devices"]:
+    if collection != db["scenario"] and collection != db["devices"]:
         collection.update_many({}, [{'$set': {'timestamp': {'$toDate': '$timestamp'}}}])
     return True
 
 
-
+def cum_visitor_count(collection):
+    collection.aggregate([
+        {
+            '$match': {
+                'recordType': '3'
+            }
+        }, {
+            '$addFields': {
+                'value': {
+                    '$cond': {
+                        'if': {
+                            '$eq': [
+                                '$event', 'personIn'
+                            ]
+                        },
+                        'then': 1,
+                        'else': -1
+                    }
+                }
+            }
+        }, {
+            '$group': {
+                '_id': {
+                    'time': {
+                        '$toDate': {
+                            '$dateToString': {
+                                'format': '%Y-%m-%d %H:00:00',
+                                'date': '$timestamp',
+                            }
+                        }
+                    }},
+                'value': {
+                    '$sum': '$value'
+                }
+            }
+        }, {
+            '$addFields': {
+                '_id': '$_id.time'
+            }
+        }, {
+            '$sort': {
+                '_id': 1
+            }
+        }, {
+            '$group': {
+                '_id': None,
+                'data': {
+                    '$push': '$$ROOT'
+                }
+            }
+        }, {
+            '$addFields': {
+                'data': {
+                    '$reduce': {
+                        'input': '$data',
+                        'initialValue': {
+                            'total': 0,
+                            'd': []
+                        },
+                        'in': {
+                            'total': {
+                                '$sum': [
+                                    '$$this.value', '$$value.total'
+                                ]
+                            },
+                            'd': {
+                                '$concatArrays': [
+                                    '$$value.d', [
+                                        {
+                                            '_id': '$$this._id',
+                                            'value': '$$this.value',
+                                            'runningTotal': {
+                                                '$sum': [
+                                                    '$$value.total', '$$this.value'
+                                                ]
+                                            }
+                                        }
+                                    ]
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        }, {
+            '$unwind': '$data.d'
+        }, {
+            '$replaceRoot': {
+                'newRoot': '$data.d'
+            }
+        }, {
+            '$out': 'cumVisitorCount'
+        }
+    ])
+    return True

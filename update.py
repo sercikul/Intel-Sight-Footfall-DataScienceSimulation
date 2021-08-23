@@ -25,6 +25,7 @@ def update():
     # Retrieve data and saved device settings of selected scenario from mongodb
     data = retrieve_from_mongo(collection_ff, db)
     scenario = retrieve_from_mongo(collection_scenario, db)
+    #print(scenario[0])
     # Get last interval-based timestamp
     start_ts = data["timestamp"].min()
     # Most recent timestamp in data set
@@ -32,6 +33,7 @@ def update():
     end_ts = "now"
     update_df = synthesise_data(scenario, use_cases, start_ts, end_ts, update_ts=last_ts)
     insert_to_mongodb(update_df, collection_ff, db, update=True)
+    cum_visitor_count(collection_ff)
     # Get updated historical data
     historical_data = retrieve_from_mongo(collection_ff, db)
     predictions = create_future_data(historical_data)
