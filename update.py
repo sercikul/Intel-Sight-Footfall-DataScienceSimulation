@@ -31,7 +31,13 @@ def update():
     # Most recent timestamp in data set
     last_ts = data["timestamp"].max()
     end_ts = "now"
-    update_df = synthesise_data(scenario, use_cases, start_ts, end_ts, update_ts=last_ts)
+    # Current visitor count
+    n_visitors = len(data[data["event"] == "personIn"]) - len(data[data["event"] == "personOut"])
+    # Lass n person in date range
+    last_n_person_in = data["timestamp"][data["event"] == "personIn"].tail(n_visitors)
+    update = {"last_ts": last_ts, "last_n_person_in": last_n_person_in}
+    #print(last_n_person_in)
+    update_df = synthesise_data(scenario, use_cases, last_ts, end_ts, update_ts=update)
     insert_to_mongodb(update_df, collection_ff, db, update=True)
     cum_visitor_count(collection_ff)
     # Get updated historical data

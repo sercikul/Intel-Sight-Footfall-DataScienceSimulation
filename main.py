@@ -8,7 +8,6 @@ from predictions import *
 
 def main_script():
     print("\nWelcome to the Sight++ Footfall Predictor !\n")
-
     # Retrieve all default scenarios
     options_dict = {"Option": [], "Yearly Seasonality": [], "Weekly Seasonality": [], "Daily Seasonality": []}
     while True:

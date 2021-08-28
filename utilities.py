@@ -45,7 +45,8 @@ def dwell_time(event_ts, crowd, overall_mean, overall_sd, first_peak, second_pea
     # Exponential function
     h_wghts = hour_weights(hour, first_peak, second_peak) + 0.5
     # Crowdedness
-    crowdedness_wght = np.sqrt(np.exp(crowd / np.max(crowd)))
+    crowdedness_wght = 1 + np.log10(crowd + 1) / 5
+    #print(np.max(crowdedness_wght))
     # Weights
     wghts = h_wghts * crowdedness_wght
     # dwell times and

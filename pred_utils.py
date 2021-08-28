@@ -1,13 +1,6 @@
-import matplotlib.pyplot as plt
 from sktime.forecasting.fbprophet import Prophet
 from sktime.forecasting.naive import NaiveForecaster
 from sktime.performance_metrics.forecasting import mean_absolute_percentage_error
-from sktime.utils.plotting import plot_series
-from sktime.forecasting.all import mean_squared_error
-from sktime.forecasting.model_selection import (SlidingWindowSplitter,
-                                                ExpandingWindowSplitter,
-                                                ForecastingRandomizedSearchCV,
-                                                ForecastingGridSearchCV)
 
 from functools import partial
 from skopt import space

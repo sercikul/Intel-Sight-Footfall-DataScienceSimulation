@@ -44,7 +44,7 @@ def create_df_timestamp(ts, scenario: dict, anom_weights, uk_holidays: list, use
 # Create array with 0 to 24 for every day inside range
 # Create normal dist of frequency for each hour
 
-def create_df_event(dr, anom_weights, uk_holidays: list, scenario: dict):
+def create_df_event(dr, anom_weights, uk_holidays: list, scenario: dict, update_ts: dict):
     # Initialise df list
     st_time = time.time()
     # Random seed for consistency
@@ -95,6 +95,13 @@ def create_df_event(dr, anom_weights, uk_holidays: list, scenario: dict):
 
     person_in_ts = pd.to_datetime(event_dt)
     df_event_in = pd.DataFrame(person_in_ts, columns=["timestamp"])
+    if update_ts:
+        last_event_dt = update_ts["last_n_person_in"]
+        df_last_event_in = pd.DataFrame(last_event_dt, columns=["timestamp"])
+        df_event_in = pd.concat([df_last_event_in, df_event_in])
+        df_event_in = df_event_in.reset_index(drop=True)
+        df_event_in = df_event_in.sort_values("timestamp", ascending=True)
+
     df_event_in['event'] = "personIn"
 
     # Crowd
@@ -143,16 +150,18 @@ def synthesise_data(scenarios: list, use_cases: dict, start_ts: str, end_ts: str
         ts = pd.date_range(start=start_ts, end=end_ts, freq=freq_ts)
         # Create anomalies
         # Check what happens if you set anom to 0
-        if ff_anom > 0:
+        if ff_anom > 0 and update_ts is None:
             anom_weights = random_anomaly_generator(ts, start_ts, end_ts, ff_anom, freq_ts)
+            print("cacik")
         else:
             anom_weights = 1
+            print("bamya")
         # If not event-based.
         if use_case != "event":
             # Concatenate low and peak times
             df = create_df_timestamp(ts, scenario, anom_weights, uk_holidays, use_case)
         else:
-            df = create_df_event(ts, anom_weights, uk_holidays, scenario)
+            df = create_df_event(ts, anom_weights, uk_holidays, scenario, update_ts)
 
         # Bring in other attributes
         df['recordType'] = record_type
@@ -164,7 +173,7 @@ def synthesise_data(scenarios: list, use_cases: dict, start_ts: str, end_ts: str
         # passed as parameter and the updated mock data is filtered, such that it only contains
         # data from the most recent datetime onwards until now.
         if update_ts:
-            df = df[df["timestamp"] > update_ts]
+            df = df[df["timestamp"] > update_ts["last_ts"]]
         scenario_lst += df.to_dict("records")
 
     df_total = scenario_lst
