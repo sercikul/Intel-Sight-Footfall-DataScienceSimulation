@@ -9,7 +9,7 @@ use_cases = {"1": "queueing", "2": "freeSeats", "3": "event"}
 
 # Time Range
 start_ts = (datetime.now() - relativedelta(years=1)).strftime("%Y-%m-%d")
-end_ts = "2021-08-23 20:00:00"
+end_ts = "now"
 
 # Default device parameters
 # HOSPITAL

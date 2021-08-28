@@ -152,10 +152,8 @@ def synthesise_data(scenarios: list, use_cases: dict, start_ts: str, end_ts: str
         # Check what happens if you set anom to 0
         if ff_anom > 0 and update_ts is None:
             anom_weights = random_anomaly_generator(ts, start_ts, end_ts, ff_anom, freq_ts)
-            print("cacik")
         else:
             anom_weights = 1
-            print("bamya")
         # If not event-based.
         if use_case != "event":
             # Concatenate low and peak times
