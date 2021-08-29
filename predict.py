@@ -1,20 +1,12 @@
 from utilities import *
 from pymongo import MongoClient
 from predictions import *
+import warnings
 
-
-# Update data
-# Further To-Dos:
-
-# Try and test parameters for other use cases. Include 2 queueing for first use case.
-
-# Configure task scheduler for optional automation
-
-# Uncomment warnings in predictions
+warnings.filterwarnings("ignore")
 
 
 # Predict
-
 def predict():
     # Predict future
     historical_data = retrieve_from_mongo(collection_ff, db)

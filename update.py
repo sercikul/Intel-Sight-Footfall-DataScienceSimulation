@@ -4,6 +4,8 @@ from utilities import *
 from tabulate import tabulate
 from pymongo import MongoClient
 from predictions import *
+import warnings
+warnings.filterwarnings("ignore")
 
 
 # Update data

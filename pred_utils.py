@@ -1,3 +1,7 @@
+import logging
+logger = logging.getLogger('fbprophet.plot')
+logger.setLevel(logging.CRITICAL)
+
 from sktime.forecasting.fbprophet import Prophet
 from sktime.forecasting.naive import NaiveForecaster
 from sktime.performance_metrics.forecasting import mean_absolute_percentage_error
@@ -11,11 +15,12 @@ from sktime.forecasting.model_selection import (
 )
 from sktime.forecasting.compose import MultiplexForecaster
 from sktime.performance_metrics.forecasting import MeanSquaredError
+import warnings
+#warnings.filterwarnings("ignore")
+warnings.simplefilter(action='ignore', category=FutureWarning)
 import numpy as np
 import pandas as pd
 
-
-# ts_utilities
 
 # Prophet parameters
 param_space_prophet = [
@@ -47,7 +52,7 @@ def optimise_prophet(params, param_names, y_log):
 hourly, daily, weekly, monthly = 1, 24, 168, 730
 
 param_space_naive = [
-    space.Categorical(["last", "drift"], name="strategy"),
+    space.Categorical(["last"], name="strategy"),
     space.Categorical([hourly, daily, weekly, monthly], name="sp")
 ]
 
@@ -123,14 +128,14 @@ def ensemble_predictions(prophet_params, naive_params, fh, y_log):
     mse = MeanSquaredError()
     forecaster_param_grid = {"selected_forecaster": ["fbprophet", "naive"]}
     gscv = ForecastingGridSearchCV(forecaster, cv=cv, param_grid=forecaster_param_grid,
-                                   verbose=10, n_jobs=2, scoring=mse)
+                                   verbose=0, n_jobs=2, scoring=mse)
 
     # Fit and Predict
     gscv.fit(y_log)
     y_pred_lg = gscv.predict(fh)
     y_pred = np.exp(y_pred_lg) - 1
 
-    print(gscv.cv_results_)
+    #print(gscv.cv_results_)
     return y_pred
 
 

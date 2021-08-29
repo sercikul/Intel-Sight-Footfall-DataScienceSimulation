@@ -5,6 +5,9 @@ from tabulate import tabulate
 from pymongo import MongoClient
 from predictions import *
 
+import warnings
+warnings.filterwarnings("ignore")
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 def main_script():
     print("\nWelcome to the Sight++ Footfall Predictor !\n")

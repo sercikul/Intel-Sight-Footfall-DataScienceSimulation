@@ -5,8 +5,6 @@ from itertools import cycle
 import holidays
 import time
 import json
-import collections
-import datetime
 
 
 def truncated_normal(mean, stddev, minval, maxval, size):

@@ -1,6 +1,7 @@
 # Time Series Predictions - SKTIME
-
-# %matplotlib inline
+import warnings
+#warnings.filterwarnings("ignore")
+warnings.simplefilter(action='ignore', category=FutureWarning)
 # from mock_data import *
 from pred_utils import *
 
