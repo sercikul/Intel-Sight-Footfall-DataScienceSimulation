@@ -75,9 +75,6 @@ def create_df_event(dr, anom_weights, uk_holidays: list, scenario: dict, update_
         crowd_lst.append(crowd_arr)
     # Processing of time series data
     dt_arr = np.array(dt_lst, dtype=object)
-    # If time series is empty, then return empty data frame
-    if not dt_arr.any():
-        return pd.DataFrame(columns=["timestamp", "event"])
     dt_conc = np.concatenate(dt_arr)
     event_dt = pd.to_datetime(dt_conc, unit="ms").sort_values()
     # Assign "personIn" text variable to each timestamp in series
