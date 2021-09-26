@@ -1,25 +1,25 @@
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
-# Devices (venues) have different footfall means/stds.
-#attributes = ['timestamp', 'deviceID', 'recordType', 'queueing', 'freeSeats', 'event']
 
-# Target use cases
+# THIS PYTHON FILE STORES THE DEFAULT SCENARIO SETTING FOR EACH MOCK DATA OPTION (VENUE TYPE)
+
+# Dictionary of use case scenarios
 use_cases = {"1": "queueing", "2": "freeSeats", "3": "event"}
 
-# Time Range
+# Observation range of mock data
 start_ts = (datetime.now() - relativedelta(years=1)).strftime("%Y-%m-%d")
 end_ts = "now"
 
 # Default device parameters
-# HOSPITAL
 
-# Seasonality
+# HOSPITAL
+# Seasonality settings for a hospital
 hospital = {"Yearly Seasonality": "Winter peaks, lower summers",
             "Weekly Seasonality": "Higher weekdays, lower weekends",
             "Daily Seasonality": "Peaks during daylight, much lower nights"}
 
-# General device info
+# General device info for a hospital
 hospital_devices = [{"_id": "1",
                      "deviceType": "Depth Camera",
                      "deviceLocation": "Main Reception",
@@ -46,7 +46,7 @@ hospital_devices = [{"_id": "1",
                      "isIndoor": True,
                      "floor": "3"}]
 
-# Scenario Statistics
+# Empirical data of the use case scenarios recorded in the fake hospital
 scenario_hospital = [{"_id": "1",
                       "useCase": "1",
                       "freq_ts": "600S",
@@ -98,12 +98,12 @@ scenario_hospital = [{"_id": "1",
 
 
 # BANK
-# Seasonality
+# Seasonality settings for a bank
 bank = {"Yearly Seasonality": "Peaks before christmas and summer holidays",
         "Weekly Seasonality": "Higher weekdays, lower weekends",
         "Daily Seasonality": "Peaks during daylight, much lower nights"}
 
-# General Device Info
+# General device info for a bank
 bank_devices = [{"_id": "1",
                  "deviceType": "Depth Camera",
                  "deviceLocation": "Sight ATM",
@@ -124,7 +124,7 @@ bank_devices = [{"_id": "1",
                  "isIndoor": True,
                  "floor": "Ground Floor"}]
 
-# Scenario Statistics
+# Empirical data of the use case scenarios recorded in the fake bank
 scenario_bank = [{"_id": "1",
                   "useCase": "1",
                   "freq_ts": "600S",
@@ -164,12 +164,12 @@ scenario_bank = [{"_id": "1",
                                "dwell_sd": 0.15}}]
 
 # PARK
-# Seasonality
+# Seasonality settings for a park
 park = {"Yearly Seasonality": "Summer peaks, lower winters",
         "Weekly Seasonality": "Higher weekends, lower weekdays",
         "Daily Seasonality": "Peaks during daylight, much lower nights"}
 
-# General Device Info
+# General device info for a park
 park_devices = [{"_id": "1",
                  "deviceType": "Depth Camera",
                  "deviceLocation": "Sight Ice Cream Shop",
@@ -192,7 +192,7 @@ park_devices = [{"_id": "1",
                  "site": "Syde Park",
                  "isIndoor": False}]
 
-# Scenario Statistics
+# Empirical data of the use case scenarios recorded in the fake park
 scenario_park = [{"_id": "1",
                   "useCase": "1",
                   "freq_ts": "600S",
@@ -243,12 +243,12 @@ scenario_park = [{"_id": "1",
                                "high_season": [7, 6]}}]
 
 # MALL
-# Seasonality
+# Seasonality settings for a mall
 mall = {"Yearly Seasonality": "Peaks before christmas and summer holidays",
         "Weekly Seasonality": "Higher weekends, lower weekdays",
         "Daily Seasonality": "Peaks during daylight, much lower nights"}
 
-# General Device Info
+# General device info for a mall
 mall_devices = [{"_id": "1",
                  "deviceType": "Depth Camera",
                  "deviceLocation": "Sight Book Shop",
@@ -266,7 +266,7 @@ mall_devices = [{"_id": "1",
                  "site": "Sight City Mall",
                  "isIndoor": True}]
 
-# Scenario Statistics
+# Empirical data of the use case scenarios recorded in the fake mall
 scenario_mall = [{"_id": "1",
                   "useCase": "1",
                   "freq_ts": "600S",
@@ -306,19 +306,19 @@ scenario_mall = [{"_id": "1",
                                "dwell_sd": 0.5}}]
 
 
-# Scenarios all in one dictionary
+# Bring all venue seasonality data together in one dict
 scenario_seasonality = {"Sight Hospital": hospital,
                         "Syde Park": park,
                         "Sight National Bank": bank,
                         "Sight City Mall": mall}
 
-# Default data set scenario parameters all in one dictionary
+# Bring all venue scenario statistics together in one dict
 scenarios = {"Sight Hospital": scenario_hospital,
              "Syde Park": scenario_park,
              "Sight National Bank": scenario_bank,
              "Sight City Mall": scenario_mall}
 
-# General info about the devices for each scenario all in one dictionary
+# Bring all device settings for each venue scenario in one dict
 device_info = {"Sight Hospital": hospital_devices,
                "Syde Park": park_devices,
                "Sight National Bank": bank_devices,

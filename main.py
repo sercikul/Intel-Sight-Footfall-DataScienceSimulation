@@ -6,16 +6,21 @@ from pymongo import MongoClient
 from predictions import *
 
 import warnings
+
 warnings.filterwarnings("ignore")
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
+
 def main_script():
+    """This is the main script and provides the UI of the tool for data synthesis.
+    The user has a menu and can select his/her preferred option."""
+
     print("\nWelcome to the Sight++ Footfall Predictor !\n")
     # Retrieve all default scenarios
     options_dict = {"Option": [], "Yearly Seasonality": [], "Weekly Seasonality": [], "Daily Seasonality": []}
     while True:
         for option in scenarios:
-            # Retrieve seasonality parameters
+            # Retrieve all seasonality parameters
             yearly_seasonality = scenario_seasonality[option]["Yearly Seasonality"]
             weekly_seasonality = scenario_seasonality[option]["Weekly Seasonality"]
             daily_seasonality = scenario_seasonality[option]["Daily Seasonality"]
@@ -24,7 +29,6 @@ def main_script():
             options_dict["Yearly Seasonality"].append(yearly_seasonality)
             options_dict["Weekly Seasonality"].append(weekly_seasonality)
             options_dict["Daily Seasonality"].append(daily_seasonality)
-
         options_df = pd.DataFrame(options_dict)
         print("\nThe table below lists several mock data sets including information about "
               "seasonality.\n")
@@ -44,7 +48,7 @@ def main_script():
             scenario = scenarios[selected_option]
             total_df = synthesise_data(scenario, use_cases, start_ts, end_ts)
             devices = device_info[selected_option]
-            # Insert data and selected scenario settings to database
+            # Insert data and scenario settings to database
             insert_to_mongodb(total_df, collection_ff, db)
             cum_visitor_count(collection_ff)
             print(f"\nHistorical data has been synthesised and is now used by machine learning algorithms to predict"
@@ -65,8 +69,9 @@ def main_script():
 
 
 if __name__ == "__main__":
-    cluster = MongoClient("mongodb+srv://sightpp:UCLSightPP2021@sightcluster.ea126.mongodb.net/myFirstDatabase"
-                          "?retryWrites=true&w=majority")
+    # Connect to MongoDB, before running main_script()
+    cluster = MongoClient("mongodb+srv://sightpp:UCLSightPP2021@sightcluster.ea126.mongodb.net"
+                          "/myFirstDatabase?retryWrites=true&w=majority")
 
     db = cluster["sight"]
     collection_ff = db["footfall"]
